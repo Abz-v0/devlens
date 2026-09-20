@@ -33,6 +33,16 @@ def analyze_file(path):
             "classes": classes,
         }
 
+def detect_todos(path):
+    lines = path.read_text().splitlines()
+
+    matches = []
+    for line_number, line in enumerate(lines):
+        parts = line.split("#", 1)
+        if len(parts) == 2 and "TODO" in parts[1]:
+            matches.append((line_number + 1, line.strip()))
+    return matches
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -68,17 +78,35 @@ def main():
                         rel_path = file.relative_to(args.path) 
                         analysis = analyze_file(file)
 
-                        print(f" \n{rel_path} — {analysis['lines']} lines")
+                        print(f"\n{rel_path} — {analysis['lines']} lines")
 
                         details = []
                         if analysis["classes"]:
-                            details.append(f"Classes ({len(analysis['classes'])}): {', '.join(analysis['classes'])}")
+                            details.append(("Classes",analysis["classes"]))
                         if analysis["functions"]:
-                            details.append(f"Functions ({len(analysis['functions'])}): {', '.join(analysis['functions'])}")
+                            details.append(("Functions", analysis["functions"]))
 
-                        for i, line in enumerate(details):
+                        for i, (label, names) in enumerate(details):
+                            first_six = names[:6]
+                            remaining = len(names) - 6
+
                             connector = "└─" if i == len(details) - 1 else "├─"
-                            print(f"  {connector} {line}")
+                            print(f"  {connector} {label} ({len(names)}):")
+
+                            for name in first_six:
+                                print(f"    • {name}")
+                            if remaining > 0:
+                                print(f"    ...and {remaining} more")
+
+                        todo_matches = detect_todos(file)
+                        if todo_matches:
+                            print(f"  ⚠ TODOs ({len(todo_matches)}):")
+                            first_ten = todo_matches[:10]
+                            remaining = len(todo_matches) - 10
+                            for (number, text) in first_ten:
+                                print(f"    line {number}: {text}")
+                            if remaining > 0:
+                                print(f"    ...and {remaining} more")
                 else:
                     print(f"No Python (.py) files found in '{args.path}'.")
             else:

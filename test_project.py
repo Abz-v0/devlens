@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from project import analyze_file, count_lines, scan_project
+from project import analyze_file, count_lines, scan_project, detect_todos
 
 
 def test_scan_project_returns_python_files(tmp_path: Path):
@@ -56,3 +56,18 @@ def test_analyze_file_returns_line_function_and_class_details(tmp_path):
     assert analysis["lines"] == 5
     assert analysis["functions"] == ["greet"]
     assert analysis["classes"] == ["User"]
+
+def test_detect_todos_returns_real_todo_comment(tmp_path):
+    todo_file = tmp_path / "todo.py"
+    todo_file.write_text("# TODO validate entry")
+    assert detect_todos(todo_file) == [(1, "# TODO validate entry")]
+
+def test_detect_todos_ignores_todo_without_hash(tmp_path):
+    print_file = tmp_path / "print.py"
+    print_file.write_text("print('TODO hello world')")
+    assert detect_todos(print_file) == []
+
+def test_detect_todos_returns_empty_list_when_no_todos(tmp_path):
+    no_todo_file = tmp_path / "no_todo.py"
+    no_todo_file.write_text("if len(name) == 2:\n    pass")
+    assert detect_todos(no_todo_file) == []
