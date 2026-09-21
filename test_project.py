@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from project import analyze_file, count_lines, scan_project, detect_todos
+from project import (
+    analyze_file,
+    count_lines,
+    detect_long_functions,
+    detect_todos,
+    scan_project,
+)
 
 
 def test_scan_project_returns_python_files(tmp_path: Path):
@@ -71,3 +77,28 @@ def test_detect_todos_returns_empty_list_when_no_todos(tmp_path):
     no_todo_file = tmp_path / "no_todo.py"
     no_todo_file.write_text("if len(name) == 2:\n    pass")
     assert detect_todos(no_todo_file) == []
+
+def test_detect_long_functions_flags_long_function(tmp_path):
+    tmp_file = tmp_path / "long.py"
+
+    body = "\n".join(
+        f"    number_{i} = {i}"
+        for i in range(1, 22)
+    )
+
+    tmp_file.write_text(
+        "def long_function():\n"
+        + body
+    )
+
+    assert detect_long_functions(tmp_file) == [("long_function", 22)]
+
+def test_detect_long_functions_returns_empty_list_if_short_function(tmp_path):
+    tmp_file = (tmp_path / "son.py")
+    
+    tmp_file.write_text(
+        "def greet():\n"
+        "    greeting = 'hello world'\n"
+        "    return greeting"
+    )
+    assert detect_long_functions(tmp_file) == []

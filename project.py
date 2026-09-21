@@ -43,6 +43,21 @@ def detect_todos(path):
             matches.append((line_number + 1, line.strip()))
     return matches
 
+def detect_long_functions(path):
+    code = path.read_text()
+    tree = ast.parse(code)
+
+    long_functions = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            if node.end_lineno is None:
+                continue
+
+            function_len = node.end_lineno - node.lineno + 1
+
+            if function_len > 20:
+                long_functions.append((node.name, function_len))
+    return long_functions
 
 def main():
     parser = argparse.ArgumentParser(
@@ -87,16 +102,20 @@ def main():
                             details.append(("Functions", analysis["functions"]))
 
                         for i, (label, names) in enumerate(details):
+                            total_length = sum(len(name) for name in names)
                             first_six = names[:6]
                             remaining = len(names) - 6
 
                             connector = "└─" if i == len(details) - 1 else "├─"
-                            print(f"  {connector} {label} ({len(names)}):")
 
-                            for name in first_six:
-                                print(f"    • {name}")
-                            if remaining > 0:
-                                print(f"    ...and {remaining} more")
+                            if total_length < 50:
+                                print(f"  {connector} {label} ({len(names)}): {(', ').join(names)}")
+                            else:
+                                print(f"  {connector} {label} ({len(names)}):")
+                                for name in first_six:
+                                    print(f"      • {name}")
+                                if remaining > 0:
+                                    print(f"      ...and {remaining} more")
 
                         todo_matches = detect_todos(file)
                         if todo_matches:
@@ -107,6 +126,13 @@ def main():
                                 print(f"    line {number}: {text}")
                             if remaining > 0:
                                 print(f"    ...and {remaining} more")
+
+                        long_functions = detect_long_functions(file)
+                        if long_functions:
+                            print(f"  ⚠ Long functions ({len(long_functions)}):")
+
+                            for (name, length) in long_functions:
+                                print(f"    {name} ({length} lines)")
                 else:
                     print(f"No Python (.py) files found in '{args.path}'.")
             else:
