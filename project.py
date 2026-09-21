@@ -17,7 +17,15 @@ def count_lines(path):
 
 def analyze_file(path):
     code = path.read_text()
-    tree = ast.parse(code)
+
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return {
+                "lines": count_lines(path),
+                "functions": [],
+                "classes": [],
+                }
 
     functions = []
     classes = []
@@ -45,7 +53,10 @@ def detect_todos(path):
 
 def detect_long_functions(path):
     code = path.read_text()
-    tree = ast.parse(code)
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return []
 
     long_functions = []
     for node in ast.walk(tree):
