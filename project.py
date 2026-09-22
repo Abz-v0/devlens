@@ -70,6 +70,37 @@ def detect_long_functions(path):
                 long_functions.append((node.name, function_len))
     return long_functions
 
+def detect_security_issues(path):
+    code = path.read_text()
+
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return []
+
+    report = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "eval"
+        ):
+            report.append((node.lineno, "eval() usage"))
+
+    suspicious_words = ("password", "passwd", "secret", "api_key", "apikey", "token", "access_key", "private_key", "credential")
+    lines = code.splitlines()
+
+    for line_number, line in enumerate(lines):
+        has_word = any(word in line.lower() for word in suspicious_words)
+        has_equals = "=" in line
+        has_quotes = '"' in line or "'" in line
+
+        if has_word and has_equals and has_quotes:
+            report.append((line_number + 1, f"possible hardcoded secret: {line.strip()}"))
+
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog= "devlens",
@@ -141,9 +172,14 @@ def main():
                         long_functions = detect_long_functions(file)
                         if long_functions:
                             print(f"  ⚠ Long functions ({len(long_functions)}):")
-
                             for (name, length) in long_functions:
                                 print(f"    {name} ({length} lines)")
+
+                        security_issues = detect_security_issues(file)
+                        if security_issues:
+                            print(f"  ⚠ Security issues ({len(security_issues)}):")
+                            for (line_number, issue) in security_issues:
+                                print(f"    line {line_number}: {issue}")
                 else:
                     print(f"No Python (.py) files found in '{args.path}'.")
             else:

@@ -4,6 +4,7 @@ from project import (
     analyze_file,
     count_lines,
     detect_long_functions,
+    detect_security_issues,
     detect_todos,
     scan_project,
 )
@@ -102,3 +103,20 @@ def test_detect_long_functions_returns_empty_list_if_short_function(tmp_path):
         "    return greeting"
     )
     assert detect_long_functions(tmp_file) == []
+
+def test_detect_security_issues_flags_eval(tmp_path):
+    tmp_file = tmp_path / "risky.py"
+    tmp_file.write_text("x = eval('2 + 2')")
+    result = detect_security_issues(tmp_file)
+    assert result == [(1, "eval() usage")]
+
+def test_detect_security_issues_flags_hardcoded_secret(tmp_path):
+    tmp_file = tmp_path / "config.py"
+    tmp_file.write_text('password = "supersecret123"')
+    result = detect_security_issues(tmp_file)
+    assert result == [(1, 'possible hardcoded secret: password = "supersecret123"')]
+
+def test_detect_security_issues_returns_empty_list_for_clean_file(tmp_path):
+    tmp_file = tmp_path / "clean.py"
+    tmp_file.write_text("x = 5\nprint('hello')")
+    assert detect_security_issues(tmp_file) == []
