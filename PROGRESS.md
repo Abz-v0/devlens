@@ -17,3 +17,20 @@
 - Added 2 tests for detect_long_functions (flags a 22-line function, ignores a short one)
 - Committed and pushed
 - Fixed a crash: analyze_file and detect_long_functions now catch SyntaxError so scanning one invalid/broken Python file doesn't crash the entire scan — found via an automated code review, evaluated its other suggestions (async def support, exit codes, sort order) and logged them as known items rather than fixing everything at once
+
+## Day 65 - Sept 22, 2026
+
+- Implemented `check_project_structure(path)`
+  - Checks for the presence of `README.md`, `requirements.txt`, and a real `tests/` directory
+  - Returns a simple list of whichever items are missing
+  - Uses an `expected` list of `(name, type)` pairs so it’s easy to extend later
+- Wired the structure check into the `scan` command (runs once on the project root, after the file loop)
+- Added full unit tests for the new function:
+  - Perfect structure → empty list
+  - Missing only README
+  - Missing only requirements.txt
+  - Missing only tests folder
+  - Everything missing
+  - `tests` exists but is a file instead of a directory
+- Fixed several bugs along the way (hard-coded names in the missing list, calling the check on individual files instead of the project root, wrong pathlib methods)
+- Next: health score calculation
