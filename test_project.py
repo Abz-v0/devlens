@@ -2,6 +2,7 @@ from pathlib import Path
 
 from project import (
     analyze_file,
+    check_project_structure,
     count_lines,
     detect_long_functions,
     detect_security_issues,
@@ -120,3 +121,57 @@ def test_detect_security_issues_returns_empty_list_for_clean_file(tmp_path):
     tmp_file = tmp_path / "clean.py"
     tmp_file.write_text("x = 5\nprint('hello')")
     assert detect_security_issues(tmp_file) == []
+
+def test_check_project_structure_returns_empty_list_if_good(tmp_path):
+    (tmp_path / "README.md").touch()
+    (tmp_path / "requirements.txt").touch()
+
+    tests = tmp_path / "tests"
+    tests.mkdir()
+
+    result = check_project_structure(tmp_path)
+
+    assert result == []
+
+def test_missing_readme(tmp_path):
+    (tmp_path / "requirements.txt").touch()
+
+    tests = tmp_path / "tests"
+    tests.mkdir()
+
+    result = check_project_structure(tmp_path)
+    
+    assert result == ["README.md"]
+
+def test_missing_requirements(tmp_path):
+    (tmp_path / "README.md").touch()
+
+    tests = tmp_path / "tests"
+    tests.mkdir()
+
+    result = check_project_structure(tmp_path)
+    
+    assert result == ["requirements.txt"]
+
+def test_missing_tests(tmp_path):
+    (tmp_path / "README.md").touch()
+    (tmp_path / "requirements.txt").touch()
+
+    result = check_project_structure(tmp_path)
+        
+    assert result == ["tests"]
+
+def test_everything_is_missing(tmp_path):
+
+    result = check_project_structure(tmp_path)
+    
+    assert result == ["README.md", "requirements.txt", "tests"]
+
+def test_tests_exists_but_is_a_file(tmp_path):
+    (tmp_path / "README.md").touch()
+    (tmp_path / "requirements.txt").touch()
+    (tmp_path / "tests").touch()
+
+    result = check_project_structure(tmp_path)
+            
+    assert result == ["tests"]

@@ -100,10 +100,29 @@ def detect_security_issues(path):
 
     return report
 
+def check_project_structure(path):
+    missing = []
+
+    expected = [
+        ("README.md", "file"),
+        ("requirements.txt", "file"),
+        ("tests", "dir"),
+    ]
+
+    for name, item_type in expected:
+        item_path = path / name
+
+        if item_type == "file" and (not item_path.exists() or not item_path.is_file()):
+            missing.append(name)
+
+        if item_type == "dir" and (not item_path.exists() or not item_path.is_dir()):
+            missing.append(name)
+
+    return missing
 
 def main():
     parser = argparse.ArgumentParser(
-        prog= "devlens",
+        prog="devlens",
         description="Analyze a Python project for common issues."
     )
 
@@ -180,6 +199,15 @@ def main():
                             print(f"  ⚠ Security issues ({len(security_issues)}):")
                             for (line_number, issue) in security_issues:
                                 print(f"    line {line_number}: {issue}")
+
+                    missing = check_project_structure(args.path)
+                    
+                    if missing:
+                        print("⚠ Project structure issues")
+                        for item in missing:
+                            print(f"{item} is missing")
+                    else:
+                        print("Project structure looks good")
                 else:
                     print(f"No Python (.py) files found in '{args.path}'.")
             else:
