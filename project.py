@@ -36,7 +36,7 @@ def analyze_file(path):
 
     # Walk through the syntax tree to pull out classes and functions
     for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             functions.append(node.name)
         elif isinstance(node, ast.ClassDef):
             classes.append(node.name)
@@ -54,7 +54,7 @@ def detect_todos(path):
         # Split the line at the first '#' to separate code from comments
         parts = line.split("#", 1)
         # If there's a comment and it contains "TODO", log it
-        if len(parts) == 2 and "TODO" in parts[1]:
+        if len(parts) == 2 and parts[1].strip().startswith("TODO"):
             matches.append((line_number + 1, line.strip()))
     return matches
 
@@ -67,7 +67,7 @@ def detect_long_functions(path):
 
     long_functions = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if node.end_lineno is None:
                 continue
 
@@ -102,6 +102,9 @@ def detect_security_issues(path):
     lines = code.splitlines()
 
     for line_number, line in enumerate(lines):
+        # Skip the line where we define the words so we don't flag ourselves!
+        if "suspicious_words =" in line:
+            continue
         has_word = any(word in line.lower() for word in suspicious_words)
         has_equals = "=" in line
         has_quotes = '"' in line or "'" in line

@@ -34,3 +34,13 @@
   - `tests` exists but is a file instead of a directory
 - Fixed several bugs along the way (hard-coded names in the missing list, calling the check on individual files instead of the project root, wrong pathlib methods)
 - Next: health score calculation
+
+## Day 66 - Sept 23, 2026
+- Added check_project_structure(): verifies README.md and requirements.txt exist
+- Added calculate_health_score(): combines structure, code quality, security, and testing into a 0-100 score (structure 20pts, code quality 30pts, security 25pts, testing 25pts, each independently capped)
+- Added calculate_testing_deduction(): checks for a tests/ folder and real test files inside it (test_*.py or *_test.py patterns), not just folder existence
+- Fixed the security false-positive from last session: detect_security_issues now skips its own suspicious_words definition line
+- Added ast.AsyncFunctionDef support to analyze_file and detect_long_functions (closes a gap from the earlier code review)
+- Wrote 12 new tests covering structure checks, testing deduction, and full health-score scenarios (verified deduction math by hand before asserting)
+- scan is now feature-complete against the original V1 checklist
+- Next: vault command (save/search/get with local JSON storage)
