@@ -4,9 +4,11 @@ from pathlib import Path
 
 
 def scan_project(path):
+    # Grab all Python files in the directory tree
     py_files = list(path.rglob("*.py"))
     valid_files = []
     for file in py_files:
+        # Skip virtual environments and cache folders so we don't scan dependencies
         if any(ignored in file.parts for ignored in ("__pycache__", ".venv", ".git")): 
             continue
         valid_files.append(file)
@@ -18,9 +20,11 @@ def count_lines(path):
 def analyze_file(path):
     code = path.read_text()
 
+    # Use the ast module to safely parse the Python file's syntax tree
     try:
         tree = ast.parse(code)
     except SyntaxError:
+        # Bail out early if the file has broken syntax
         return {
                 "lines": count_lines(path),
                 "functions": [],
@@ -30,6 +34,7 @@ def analyze_file(path):
     functions = []
     classes = []
 
+    # Walk through the syntax tree to pull out classes and functions
     for node in ast.walk(tree):
         if isinstance(node, ast.FunctionDef):
             functions.append(node.name)
@@ -46,7 +51,9 @@ def detect_todos(path):
 
     matches = []
     for line_number, line in enumerate(lines):
+        # Split the line at the first '#' to separate code from comments
         parts = line.split("#", 1)
+        # If there's a comment and it contains "TODO", log it
         if len(parts) == 2 and "TODO" in parts[1]:
             matches.append((line_number + 1, line.strip()))
     return matches
@@ -64,8 +71,10 @@ def detect_long_functions(path):
             if node.end_lineno is None:
                 continue
 
+            # Calculate function length by subtracting line numbers
             function_len = node.end_lineno - node.lineno + 1
 
+            # Flag functions that are over 20 lines long
             if function_len > 20:
                 long_functions.append((node.name, function_len))
     return long_functions
@@ -80,6 +89,7 @@ def detect_security_issues(path):
 
     report = []
     for node in ast.walk(tree):
+        # Look for eval() calls, which are a major security risk
         if (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
@@ -87,6 +97,7 @@ def detect_security_issues(path):
         ):
             report.append((node.lineno, "eval() usage"))
 
+    # Heuristic to detect hardcoded secrets: look for suspicious words, an equals sign, and quotes
     suspicious_words = ("password", "passwd", "secret", "api_key", "apikey", "token", "access_key", "private_key", "credential")
     lines = code.splitlines()
 
@@ -95,6 +106,7 @@ def detect_security_issues(path):
         has_equals = "=" in line
         has_quotes = '"' in line or "'" in line
 
+        # If it looks like a variable assignment with a string value, flag it
         if has_word and has_equals and has_quotes:
             report.append((line_number + 1, f"possible hardcoded secret: {line.strip()}"))
 
@@ -103,6 +115,7 @@ def detect_security_issues(path):
 def check_project_structure(path):
     missing = []
 
+    # Define what a standard, healthy project structure looks like
     expected = [
         ("README.md", "file"),
         ("requirements.txt", "file"),
@@ -120,7 +133,84 @@ def check_project_structure(path):
 
     return missing
 
+def calculate_structure_deduction(path):
+    deduction = 0
+    missing = check_project_structure(path)
+    
+    # Penalize heavily for missing core project files
+    if "README.md" in missing:
+        deduction += 10
+    if "requirements.txt" in missing:
+        deduction += 10
+
+    return deduction
+
+def calculate_code_quality_deduction(py_files):
+    total_todos = 0
+    total_long_functions = 0
+
+    # Aggregate all code quality issues across the project
+    for file in py_files:
+        total_todos += len(detect_todos(file))
+        total_long_functions += len(detect_long_functions(file))
+
+    # Deduct points, but cap the penalties so they don't spiral out of control
+    deduction = 0
+    deduction += min(total_todos * 2, 15)
+    deduction += min(total_long_functions * 3, 15)
+
+    return deduction
+
+def calculate_security_deduction(py_files):
+    total_eval = 0
+    total_secrets = 0
+
+    for file in py_files:
+        issues = detect_security_issues(file)
+        for _, issue in issues:
+            if issue == "eval() usage":
+                total_eval += 1
+            elif issue.startswith("possible hardcoded secret"):
+                total_secrets += 1
+
+    # eval() is penalized more heavily than potential secrets
+    deduction = 0
+    deduction += total_eval * 10
+    deduction += total_secrets * 5
+
+    # Cap the maximum security deduction
+    return min(deduction, 25)
+
+def calculate_testing_deduction(path):
+    deduction = 0
+    tests_dir = path / "tests"
+    
+    # Big penalty if the tests folder doesn't even exist
+    if not tests_dir.is_dir():
+        deduction += 25
+    else:
+        # Look for common test file naming conventions inside the tests dir
+        test_files = list(tests_dir.glob("test_*.py")) + list(tests_dir.glob("*_test.py"))
+        
+        # Smaller penalty if the folder exists but is empty
+        if not test_files:
+            deduction += 12
+            
+    return deduction
+
+def calculate_health_score(path, py_files):
+    # Start with a perfect score and subtract penalties for each issue category
+    score = 100
+    score -= calculate_structure_deduction(path)
+    score -= calculate_code_quality_deduction(py_files)
+    score -= calculate_security_deduction(py_files)
+    score -= calculate_testing_deduction(path)
+
+    # Never let the score drop below zero
+    return max(score, 0)
+
 def main():
+    # Set up the CLI argument parser
     parser = argparse.ArgumentParser(
         prog="devlens",
         description="Analyze a Python project for common issues."
@@ -151,11 +241,13 @@ def main():
                     print(f"Scanning: {args.path}\n")
                     print(f"{len(py_files)} Python files found:")
                     for file in py_files:
+                        # Get a clean, relative path for display purposes
                         rel_path = file.relative_to(args.path) 
                         analysis = analyze_file(file)
 
                         print(f"\n{rel_path} — {analysis['lines']} lines")
 
+                        # Group the classes and functions together for the tree output
                         details = []
                         if analysis["classes"]:
                             details.append(("Classes",analysis["classes"]))
@@ -167,10 +259,13 @@ def main():
                             first_six = names[:6]
                             remaining = len(names) - 6
 
+                            # Use a tree-like connector to make the output look like a directory tree
                             connector = "└─" if i == len(details) - 1 else "├─"
 
+                            # If the names are short enough, print them on one line
                             if total_length < 50:
                                 print(f"  {connector} {label} ({len(names)}): {(', ').join(names)}")
+                            # Otherwise, list them out vertically to keep it readable
                             else:
                                 print(f"  {connector} {label} ({len(names)}):")
                                 for name in first_six:
@@ -178,6 +273,7 @@ def main():
                                 if remaining > 0:
                                     print(f"      ...and {remaining} more")
 
+                        # Report any TODOs found, limiting output to the first 10
                         todo_matches = detect_todos(file)
                         if todo_matches:
                             print(f"  ⚠ TODOs ({len(todo_matches)}):")
@@ -188,26 +284,33 @@ def main():
                             if remaining > 0:
                                 print(f"    ...and {remaining} more")
 
+                        # Report long functions
                         long_functions = detect_long_functions(file)
                         if long_functions:
                             print(f"  ⚠ Long functions ({len(long_functions)}):")
                             for (name, length) in long_functions:
                                 print(f"    {name} ({length} lines)")
 
+                        # Report security issues
                         security_issues = detect_security_issues(file)
                         if security_issues:
                             print(f"  ⚠ Security issues ({len(security_issues)}):")
                             for (line_number, issue) in security_issues:
                                 print(f"    line {line_number}: {issue}")
 
+                    # Summarize missing project structure files at the very end
                     missing = check_project_structure(args.path)
                     
                     if missing:
-                        print("⚠ Project structure issues")
+                        print("\n⚠ Project structure issues")
                         for item in missing:
                             print(f"{item} is missing")
                     else:
                         print("Project structure looks good")
+
+                    # Print the final calculated score
+                    health_score = calculate_health_score(args.path, py_files)
+                    print(f"\nHealth Score: {health_score}/100")
                 else:
                     print(f"No Python (.py) files found in '{args.path}'.")
             else:
