@@ -2,6 +2,8 @@ from pathlib import Path
 
 from project import (
     analyze_file,
+    calculate_health_score,
+    calculate_testing_deduction,
     check_project_structure,
     count_lines,
     detect_long_functions,
@@ -162,10 +164,7 @@ def test_missing_tests(tmp_path):
     assert result == ["tests"]
 
 def test_everything_is_missing(tmp_path):
-
-    result = check_project_structure(tmp_path)
-    
-    assert result == ["README.md", "requirements.txt", "tests"]
+    assert check_project_structure(tmp_path) == ["README.md", "requirements.txt", "tests"]
 
 def test_tests_exists_but_is_a_file(tmp_path):
     (tmp_path / "README.md").touch()
@@ -175,3 +174,56 @@ def test_tests_exists_but_is_a_file(tmp_path):
     result = check_project_structure(tmp_path)
             
     assert result == ["tests"]
+
+def test_calculate_testing_deduction_returns_25_if_no_test_folder(tmp_path):
+
+    assert calculate_testing_deduction(tmp_path) == 25
+
+def test_calculate_testing_deduction_returns_12_if_no_test_file(tmp_path):
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "__init__.py").touch()
+
+    assert calculate_testing_deduction(tmp_path) == 12
+
+def test_calculate_testing_deduction_returns_0_if_test_file(tmp_path):
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_.py").touch()
+
+    assert calculate_testing_deduction(tmp_path) == 0
+
+def test_file_in_good_health(tmp_path):
+    (tmp_path / "README.md").touch()
+    (tmp_path / "requirements.txt").touch()
+
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_.py").touch()
+
+    tmp_file = tmp_path / "health.py"
+    
+    body = "\n".join(
+        f"    number_{i} = {i}"
+        for i in range(1, 22)
+    )
+
+    tmp_file.write_text(
+        "def health_number():\n"
+        + body
+    )
+
+    assert calculate_health_score(tmp_path, [tmp_file]) == 97
+
+def test_file_in_bad_health(tmp_path):
+    (tmp_path / "requirements.txt").touch()
+
+    todo_file = tmp_path / "todo.py"
+    todo_file.write_text(
+        "def validate():\n"
+        "pass\n"
+        "# TODO change pass to actual logic"
+        "# TODO add input counter"
+    )
+
+    assert calculate_health_score(tmp_path, [todo_file]) == 63
