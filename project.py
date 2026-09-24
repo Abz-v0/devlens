@@ -15,7 +15,7 @@ class Color:
 def get_score_bar(score):
     """Returns a visual progress bar for the health score."""
     bar_length = 20
-    filled_length = int(round(bar_length * score / 100))
+    filled_length = (round(bar_length * score / 100))
     bar = "█" * filled_length + "░" * (bar_length - filled_length)
     
     if score >= 80:
