@@ -44,3 +44,13 @@
 - Wrote 12 new tests covering structure checks, testing deduction, and full health-score scenarios (verified deduction math by hand before asserting)
 - scan is now feature-complete against the original V1 checklist
 - Next: vault command (save/search/get with local JSON storage)
+
+## Day 67 - Sept 24, 2026
+- Polished scan output: Added raw ANSI colors (warnings in yellow/red, success in green, file headers in cyan) using a custom Color class
+- Added a visual progress bar for the Health Score (dynamically colors green/yellow/red based on score)
+- Restructured main() print statements for cleaner spacing, dotted file separators, and better visual hierarchy
+- Design choice: Chose raw ANSI escape codes over third-party libraries (like colorist) to keep DevLens completely dependency-free
+- Fixed a UnicodeDecodeError on Windows by enforcing encoding="utf-8" across all path.read_text() calls
+- Fixed detect_todos to use startswith("TODO") to prevent flagging comments that merely mention the word
+- Did a deep-dive code review to understand AST vs text processing, capped deductions, and Python file encodings
+- Next: Start building the vault command from scratch (local JSON storage for snippets)

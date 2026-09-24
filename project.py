@@ -3,6 +3,30 @@ import ast
 from pathlib import Path
 
 
+class Color:
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    RED = "\033[91m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    CYAN = "\033[96m"
+    GRAY = "\033[90m"
+
+def get_score_bar(score):
+    """Returns a visual progress bar for the health score."""
+    bar_length = 20
+    filled_length = int(round(bar_length * score / 100))
+    bar = "█" * filled_length + "░" * (bar_length - filled_length)
+    
+    if score >= 80:
+        color = Color.GREEN
+    elif score >= 50:
+        color = Color.YELLOW
+    else:
+        color = Color.RED
+        
+    return f"{color}{bar}{Color.RESET}"
+
 def scan_project(path):
     # Grab all Python files in the directory tree
     py_files = list(path.rglob("*.py"))
@@ -15,10 +39,10 @@ def scan_project(path):
     return valid_files
 
 def count_lines(path):
-    return len(path.read_text().splitlines())
+    return len(path.read_text(encoding="utf-8").splitlines())
 
 def analyze_file(path):
-    code = path.read_text()
+    code = path.read_text(encoding="utf-8")
 
     # Use the ast module to safely parse the Python file's syntax tree
     try:
@@ -47,7 +71,7 @@ def analyze_file(path):
         }
 
 def detect_todos(path):
-    lines = path.read_text().splitlines()
+    lines = path.read_text(encoding="utf-8").splitlines()
 
     matches = []
     for line_number, line in enumerate(lines):
@@ -59,7 +83,7 @@ def detect_todos(path):
     return matches
 
 def detect_long_functions(path):
-    code = path.read_text()
+    code = path.read_text(encoding="utf-8")
     try:
         tree = ast.parse(code)
     except SyntaxError:
@@ -80,7 +104,7 @@ def detect_long_functions(path):
     return long_functions
 
 def detect_security_issues(path):
-    code = path.read_text()
+    code = path.read_text(encoding="utf-8")
 
     try:
         tree = ast.parse(code)
@@ -241,14 +265,19 @@ def main():
             if args.path.is_dir():
                 py_files = scan_project(args.path)
                 if py_files:
-                    print(f"Scanning: {args.path}\n")
-                    print(f"{len(py_files)} Python files found:")
+                    # --- TOP HEADER ---
+                    print(f"\n{Color.CYAN}{'─' * 50}{Color.RESET}")
+                    print(f"{Color.BOLD}DevLens Scan:{Color.RESET} {args.path}")
+                    print(f"{Color.CYAN}{'─' * 50}{Color.RESET}")
+                    print(f"{len(py_files)} Python files found.\n")
+
                     for file in py_files:
-                        # Get a clean, relative path for display purposes
                         rel_path = file.relative_to(args.path) 
                         analysis = analyze_file(file)
 
-                        print(f"\n{rel_path} — {analysis['lines']} lines")
+                        # File name and subtle dotted separator
+                        print(f"{Color.CYAN}{rel_path}{Color.RESET} {Color.GRAY}({analysis['lines']} lines){Color.RESET}")
+                        print(f"{Color.GRAY}{'·' * 50}{Color.RESET}")
 
                         # Group the classes and functions together for the tree output
                         details = []
@@ -261,65 +290,73 @@ def main():
                             total_length = sum(len(name) for name in names)
                             first_six = names[:6]
                             remaining = len(names) - 6
-
-                            # Use a tree-like connector to make the output look like a directory tree
                             connector = "└─" if i == len(details) - 1 else "├─"
 
-                            # If the names are short enough, print them on one line
                             if total_length < 50:
-                                print(f"  {connector} {label} ({len(names)}): {(', ').join(names)}")
-                            # Otherwise, list them out vertically to keep it readable
+                                print(f"  {connector} {Color.GRAY}{label}{Color.RESET} ({len(names)}): {(', ').join(names)}")
                             else:
-                                print(f"  {connector} {label} ({len(names)}):")
+                                print(f"  {connector} {Color.GRAY}{label}{Color.RESET} ({len(names)}):")
                                 for name in first_six:
                                     print(f"      • {name}")
                                 if remaining > 0:
-                                    print(f"      ...and {remaining} more")
+                                    print(f"      {Color.GRAY}• ...and {remaining} more{Color.RESET}")
 
-                        # Report any TODOs found, limiting output to the first 10
+                        # Blank line between structure and warnings
+                        if details and (detect_todos(file) or detect_long_functions(file) or detect_security_issues(file)):
+                            print()
+
+                        # Report any TODOs found
                         todo_matches = detect_todos(file)
                         if todo_matches:
-                            print(f"  ⚠ TODOs ({len(todo_matches)}):")
+                            print(f"  {Color.YELLOW}⚠ TODOs{Color.RESET} ({len(todo_matches)}):")
                             first_ten = todo_matches[:10]
                             remaining = len(todo_matches) - 10
                             for (number, text) in first_ten:
-                                print(f"    line {number}: {text}")
+                                print(f"    {Color.GRAY}• line {number}:{Color.RESET} {text}")
                             if remaining > 0:
-                                print(f"    ...and {remaining} more")
+                                print(f"    {Color.GRAY}• ...and {remaining} more{Color.RESET}")
 
                         # Report long functions
                         long_functions = detect_long_functions(file)
                         if long_functions:
-                            print(f"  ⚠ Long functions ({len(long_functions)}):")
+                            print(f"  {Color.YELLOW}⚠ Long functions{Color.RESET} ({len(long_functions)}):")
                             for (name, length) in long_functions:
-                                print(f"    {name} ({length} lines)")
+                                print(f"    {Color.GRAY}• {Color.RED}{name}{Color.RESET} ({length} lines)")
 
                         # Report security issues
                         security_issues = detect_security_issues(file)
                         if security_issues:
-                            print(f"  ⚠ Security issues ({len(security_issues)}):")
+                            print(f"  {Color.RED}⚠ Security issues{Color.RESET} ({len(security_issues)}):")
                             for (line_number, issue) in security_issues:
-                                print(f"    line {line_number}: {issue}")
+                                print(f"    {Color.GRAY}• line {line_number}:{Color.RESET} {Color.RED}{issue}{Color.RESET}")
+                        
+                        print() # Blank line after each file
 
-                    # Summarize missing project structure files at the very end
+                    # --- BOTTOM STRUCTURE SUMMARY ---
                     missing = check_project_structure(args.path)
                     
+                    print(f"{Color.CYAN}{'─' * 50}{Color.RESET}")
+                    print(f"{Color.BOLD}Project Structure{Color.RESET}")
+                    print(f"{Color.CYAN}{'─' * 50}{Color.RESET}")
+                    
                     if missing:
-                        print("\n⚠ Project structure issues")
                         for item in missing:
-                            print(f"{item} is missing")
+                            print(f"  {Color.RED}✗ {item} is missing{Color.RESET}")
                     else:
-                        print("Project structure looks good")
+                        print(f"  {Color.GREEN}✓ Project structure looks good{Color.RESET}")
 
-                    # Print the final calculated score
+                    # --- FINAL HEALTH SCORE ---
                     health_score = calculate_health_score(args.path, py_files)
-                    print(f"\nHealth Score: {health_score}/100")
+                    
+                    print(f"\n{'═' * 50}")
+                    print(f"Health Score: {get_score_bar(health_score)} {Color.BOLD}{health_score}/100{Color.RESET}")
+                    print(f"{'═' * 50}\n")
                 else:
-                    print(f"No Python (.py) files found in '{args.path}'.")
+                    print(f"{Color.YELLOW}No Python (.py) files found in '{args.path}'.{Color.RESET}")
             else:
-                print(f"'{args.path}'is not a project directory")
+                print(f"{Color.RED}Error: '{args.path}' is not a project directory{Color.RESET}")
         else:
-            print(f"Error '{args.path}' does not exist.")
+            print(f"{Color.RED}Error: '{args.path}' does not exist.{Color.RESET}")
 
 if __name__ == "__main__":
     main()
