@@ -54,3 +54,9 @@
 - Fixed detect_todos to use startswith("TODO") to prevent flagging comments that merely mention the word
 - Did a deep-dive code review to understand AST vs text processing, capped deductions, and Python file encodings
 - Next: Start building the vault command from scratch (local JSON storage for snippets)
+
+## Day 68 - Sept 25, 2026
+- Started Phase 3: Building the vault command (local code snippet library)
+- Planned hybrid architecture: store actual .py files in ~/.devlens/vault/ and track metadata in index.json
+- Implemented get_vault_dir(): uses Path.home() to dynamically create the hidden .devlens/vault/ directory cross-platform
+- Next: Implement load_index() and save_index() using Python's json module

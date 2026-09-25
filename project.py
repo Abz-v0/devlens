@@ -12,6 +12,12 @@ class Color:
     CYAN = "\033[96m"
     GRAY = "\033[90m"
 
+
+def get_vault_dir():
+    vault_dir = Path.home() / ".devlens" /"vault"
+    vault_dir.mkdir(parents=True, exist_ok=True)
+    return vault_dir
+
 def get_score_bar(score):
     """Returns a visual progress bar for the health score."""
     bar_length = 20
