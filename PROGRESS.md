@@ -60,3 +60,14 @@
 - Planned hybrid architecture: store actual .py files in ~/.devlens/vault/ and track metadata in index.json
 - Implemented get_vault_dir(): uses Path.home() to dynamically create the hidden .devlens/vault/ directory cross-platform
 - Next: Implement load_index() and save_index() using Python's json module
+
+## Day 68 - Sept 25, 2026
+- Started vault command: Designed hybrid storage architecture (raw files for code, JSON index for metadata)
+- Implemented backend logic functions: get_vault_dir(), load_index(), save_index()
+- Implemented save_snippet() (copies file to vault, updates JSON index with UTC timestamp)
+- Realized shutil.copy2 can natively preserve file metadata, will swap out manual datetime logic tomorrow for cleaner code
+- Implemented search_snippets() (uses list comprehension over JSON index keys)
+- Implemented get_snippet() (returns Path or None)
+- Separated concerns: logic functions return data/booleans, CLI handles the printing/colors
+- Wired up save, search, and get subparsers in main()
+- Next: Swap to shutil.copy2, complete the main() CLI logic for vault commands, and test the workflow

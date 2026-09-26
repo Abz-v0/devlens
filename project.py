@@ -1,5 +1,8 @@
 import argparse
 import ast
+import json
+import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -14,9 +17,63 @@ class Color:
 
 
 def get_vault_dir():
-    vault_dir = Path.home() / ".devlens" /"vault"
+    """Returns the path to the vault directory, creating it if it doesn't exist."""
+    vault_dir = Path.home() / ".devlens" / "vault"
     vault_dir.mkdir(parents=True, exist_ok=True)
     return vault_dir
+
+def get_index_path():
+    """Returns the path to the index.json file."""
+    return Path.home() / ".devlens" / "index.json"
+
+def load_index():
+    """Loads the JSON index, returning an empty dict if it doesn't exist yet."""
+    index_path = get_index_path()
+
+    if index_path.exists():
+        try:
+            return json.loads(index_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+def save_index(data):
+    """Saves the dictionary back to index.json."""
+    index_path = get_index_path()
+    index_path.write_text(json.dumps(data, indent=4), encoding="utf-8")
+
+def save_snippet(file_path):
+    """Copies a file into the vault and updates the index."""
+    if not file_path.exists() or not file_path.is_file():
+        return False
+
+    dest_path = get_vault_dir() / file_path.name
+    shutil.copy(file_path, dest_path)
+
+    index = load_index()
+    current_time = datetime.now(timezone.utc).strftime("%Y-%m-%d--%H:%M:%S%z")
+
+    index[file_path.name] = {
+        "original_path": str(file_path),
+        "saved_at": current_time
+    }
+    save_index(index)
+    return f"Saved '{file_path.name}' to the vault."
+
+def search_snippets(query):
+    """Searches the index for snippet names matching the query."""
+    index = load_index()
+    matches = [name for name in index if query.lower() in name.lower()]
+
+    return matches
+
+def get_snippet(name):
+    path = get_vault_dir() / name
+
+    if path.exists() and path.is_file():
+        return path
+    else:
+        return None
 
 def get_score_bar(score):
     """Returns a visual progress bar for the health score."""
@@ -246,20 +303,22 @@ def main():
     # Set up the CLI argument parser
     parser = argparse.ArgumentParser(
         prog="devlens",
-        description="Analyze a Python project for common issues."
+        description="A developer toolkit to scan Python projects and manage a local code snippet vault."
     )
 
     subparsers = parser.add_subparsers(dest="command")
 
-    scan_parser = subparsers.add_parser(
-        "scan",
-        help="Scan a python project."
-    )
-    scan_parser.add_argument(
-        "path",
-        type=Path,
-        help="Path to the project to scan."
-    )
+    scan_parser = subparsers.add_parser("scan", help="Scan a python project.")
+    scan_parser.add_argument("path", type=Path, help="Path to the project to scan.")
+
+    save_parser = subparsers.add_parser("save", help="Save a file to the vault.")
+    save_parser.add_argument("file", type=Path, help="Path to the file to save.")
+
+    search_parser = subparsers.add_parser("search", help="Search the vault.")
+    search_parser.add_argument("query", type=str, help="Search query.")
+
+    get_parser = subparsers.add_parser("get", help="Print a snippet from the vault.")
+    get_parser.add_argument("name", type=str, help="Name of the snippet to retrieve.")
 
     args = parser.parse_args()
 
@@ -363,6 +422,9 @@ def main():
                 print(f"{Color.RED}Error: '{args.path}' is not a project directory{Color.RESET}")
         else:
             print(f"{Color.RED}Error: '{args.path}' does not exist.{Color.RESET}")
+
+    elif args.command == "save":
+        pass
 
 if __name__ == "__main__":
     main()
