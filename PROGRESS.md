@@ -71,3 +71,11 @@
 - Separated concerns: logic functions return data/booleans, CLI handles the printing/colors
 - Wired up save, search, and get subparsers in main()
 - Next: Swap to shutil.copy2, complete the main() CLI logic for vault commands, and test the workflow
+
+## Day 70 - Sept 27, 2026
+- Swapped save_snippet()'s manual datetime logic for shutil.copy2, which preserves file metadata natively (planned on Day 69)
+- Completed main() CLI logic for vault: wired save, search, and get subcommands with colored success/error/empty-result output
+- Manually tested the full vault workflow via CLI (save, search, get all working correctly)
+- Realized get() dumps the whole file with no way to pull just one function/class — logged as a real V2 feature (get <file> --function <name> using ast line numbers), not scope creep for V1
+- Researched how to safely test vault functions that depend on Path.home() without touching the real filesystem — landed on a monkeypatch fixture patching Path.home() itself, since patching get_vault_dir/get_index_path separately risks a missed patch leaking into the real ~/.devlens folder
+- Next (tomorrow): write and pass the vault test suite, then start the create command (last unbuilt V1 feature)
