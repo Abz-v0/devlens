@@ -48,7 +48,7 @@ def save_snippet(file_path):
         return False
 
     dest_path = get_vault_dir() / file_path.name
-    shutil.copy(file_path, dest_path)
+    shutil.copy2(file_path, dest_path)
 
     index = load_index()
     current_time = datetime.now(timezone.utc).strftime("%Y-%m-%d--%H:%M:%S%z")
@@ -58,7 +58,7 @@ def save_snippet(file_path):
         "saved_at": current_time
     }
     save_index(index)
-    return f"Saved '{file_path.name}' to the vault."
+    return True
 
 def search_snippets(query):
     """Searches the index for snippet names matching the query."""
@@ -424,7 +424,29 @@ def main():
             print(f"{Color.RED}Error: '{args.path}' does not exist.{Color.RESET}")
 
     elif args.command == "save":
-        pass
+        success = save_snippet(args.file)
+
+        if success:
+            print(f"{Color.GREEN}✓ Saved '{args.file.name}' to the vault.{Color.RESET}")
+        else:
+            print(f"{Color.RED}Error: '{args.file.name}' is not a valid file.{Color.RESET}")
+    
+    elif args.command == "search":
+        matches = search_snippets(args.query)
+        if matches:
+            print(f"{Color.GREEN}Found {len(matches)} snippets:{Color.RESET}")
+            for name in matches:
+                print(f"  • {name}")
+        else:
+            print(f"{Color.YELLOW}No snippets found matching '{args.query}'.{Color.RESET}")
+
+    elif args.command == "get":
+        path = get_snippet(args.name)
+        if path:
+            print(path.read_text(encoding="utf-8"))
+        else:
+            print(f"{Color.RED}Error: Snippet '{args.name}' not found in vault.{Color.RESET}")
+
 
 if __name__ == "__main__":
     main()
