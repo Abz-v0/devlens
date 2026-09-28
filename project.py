@@ -29,7 +29,6 @@ def get_index_path():
 def load_index():
     """Loads the JSON index, returning an empty dict if it doesn't exist yet."""
     index_path = get_index_path()
-
     if index_path.exists():
         try:
             return json.loads(index_path.read_text(encoding="utf-8"))
@@ -40,6 +39,7 @@ def load_index():
 def save_index(data):
     """Saves the dictionary back to index.json."""
     index_path = get_index_path()
+    index_path.parent.mkdir(parents=True, exist_ok=True)
     index_path.write_text(json.dumps(data, indent=4), encoding="utf-8")
 
 def save_snippet(file_path):

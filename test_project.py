@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from project import (
     analyze_file,
     calculate_health_score,
@@ -9,9 +10,88 @@ from project import (
     detect_long_functions,
     detect_security_issues,
     detect_todos,
+    get_snippet,
+    get_vault_dir,
+    load_index,
+    save_index,
+    save_snippet,
     scan_project,
+    search_snippets,
 )
 
+
+@pytest.fixture
+def mock_home(monkeypatch, tmp_path):
+    """Safely redirects Path.home() to a temporary test directory."""
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    return tmp_path
+
+
+def test_get_vault_dir_creates_folder_under_fake_home(mock_home):
+    vault_dir = get_vault_dir()
+
+    assert vault_dir.exists()
+    assert vault_dir.relative_to(mock_home) == Path(".devlens/vault")
+
+
+def test_save_and_load_index_round_trip(mock_home):
+    test_data = {"snippet.py": {"original_path": "/fake/path", "saved_at": "now"}}
+
+    save_index(test_data)
+    loaded_data = load_index()
+
+    assert loaded_data == test_data
+
+def test_save_snippet_copies_file_and_updates_index(mock_home, tmp_path):
+    tmp_file = tmp_path / "my_script.py"
+    tmp_file.write_text("print('hello')", encoding="utf-8")
+
+    success = save_snippet(tmp_file)
+
+    assert success is True
+
+    expected_vault_file = mock_home / ".devlens" / "vault" / "my_script.py"
+    assert expected_vault_file.exists()
+    assert expected_vault_file.read_text() == "print('hello')"
+
+    index = load_index()
+    assert "my_script.py" in index
+    assert index["my_script.py"]["original_path"] == str(tmp_file)
+
+def test_save_snippet_returns_false_for_invalid_file(mock_home, tmp_path):
+    fake_file = tmp_path / "ghost.py"
+
+    result = save_snippet(fake_file)
+
+    assert result is False
+
+def test_search_snippets_finds_matching_names(mock_home):
+    test_dict = {
+        "auth.py": {}, 
+        "data.py": {}, 
+        "bro.py": {}
+    }
+
+    save_index(test_dict)
+    results = search_snippets("auth")
+
+    assert results == ["auth.py"]
+
+def test_get_snippet_returns_path_if_exists(mock_home, tmp_path):
+    dummy_file = tmp_path / "validator.py"
+    dummy_file.write_text("x = 1")
+    save_snippet(dummy_file)
+
+    path = get_snippet("validator.py")
+
+    assert isinstance(path, Path)
+    assert path.exists()
+
+
+def test_get_snippet_returns_none_if_missing(mock_home):
+    path = get_snippet("ghost_file.py")
+
+    assert path is None
 
 def test_scan_project_returns_python_files(tmp_path: Path):
     (tmp_path / "main.py").touch()
