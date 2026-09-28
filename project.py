@@ -75,6 +75,21 @@ def get_snippet(name):
     else:
         return None
 
+def create_project(name):
+    project_dir = Path.cwd() / name
+
+    if project_dir.exists():
+        return False
+
+    project_dir.mkdir()
+    (project_dir / "tests").mkdir()
+    (project_dir / "main.py").touch()
+    (project_dir / "README.md").write_text(f"# {name}")
+    (project_dir / "requirements.txt").touch()
+    (project_dir / "tests" / "test_main.py").touch()
+
+    return True
+
 def get_score_bar(score):
     """Returns a visual progress bar for the health score."""
     bar_length = 20
@@ -120,6 +135,7 @@ def analyze_file(path):
 
     functions = []
     classes = []
+    imports = []
 
     # Walk through the syntax tree to pull out classes and functions
     for node in ast.walk(tree):
@@ -127,10 +143,17 @@ def analyze_file(path):
             functions.append(node.name)
         elif isinstance(node, ast.ClassDef):
             classes.append(node.name)
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                imports.append(alias.name)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imports.append(node.module)
+        
     return {
             "lines": count_lines(path),
             "functions": functions,
             "classes": classes,
+            "imports": imports,
         }
 
 def detect_todos(path):
@@ -320,6 +343,12 @@ def main():
     get_parser = subparsers.add_parser("get", help="Print a snippet from the vault.")
     get_parser.add_argument("name", type=str, help="Name of the snippet to retrieve.")
 
+    create_parser = subparsers.add_parser("create", help="Create a project in current directory")
+    create_parser.add_argument("name", type=str, help="Name of the new project.")
+
+    explain_parser = subparsers.add_parser("explain", help="Explain a project")
+    explain_parser.add_argument("file", type=Path, help="Name of project to explain")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -446,6 +475,74 @@ def main():
             print(path.read_text(encoding="utf-8"))
         else:
             print(f"{Color.RED}Error: Snippet '{args.name}' not found in vault.{Color.RESET}")
+
+    elif args.command == "create":
+        success = create_project(args.name)
+
+        if success:
+            print(f"{Color.GREEN}✓ Project '{args.name}' created successfully!{Color.RESET}")
+        else:
+            print(f"{Color.RED}Error: Directory '{args.name}' already exists.{Color.RESET}")
+
+    elif args.command == "explain":
+        if not args.file.exists() or not args.file.is_file():
+            print(f"{Color.RED}Error: '{args.file}' is not a valid file.{Color.RESET}")
+        else:
+            analysis = analyze_file(args.file)
+
+            # --- HEADER ---
+            print(f"\n{Color.CYAN}{'-' * 50}{Color.RESET}")
+            print(f"\n{Color.BOLD}DevLens Explain:{Color.RESET} '{args.file.name}'")
+            print(f"\n{Color.CYAN}{'-' * 50}{Color.RESET}")
+
+            # --- Overview ---
+            print(f"{Color.BOLD}Overview:{Color.RESET}")
+            print(f"  • Lines: {Color.GREEN}{analysis['lines']}{Color.RESET}")
+            print(f"  • Imports: {Color.GREEN}{len(analysis['imports'])}{Color.RESET}")
+            print(f"  • Classes: {Color.GREEN}{len(analysis['classes'])}{Color.RESET}")
+            print(f"  • Functions: {Color.GREEN}{len(analysis['functions'])}{Color.RESET}")
+            print()
+
+            # --- DEPENDENCIES ---
+            if analysis['imports']:
+                print(f"{Color.BOLD}Dependencies{Color.RESET}")
+                for imp in analysis['imports']:
+                    print(f"  • {Color.GRAY}{imp}{Color.RESET}")
+                print()
+                
+            # --- DEFINITIONS ---
+            if analysis['classes'] or analysis['functions']:
+                print(f"{Color.BOLD}Definitions{Color.RESET}")
+                for cls in analysis['classes']:
+                    print(f"  • Class: {Color.CYAN}{cls}{Color.RESET}")
+                for func in analysis['functions']:
+                    print(f"  • Function: {Color.CYAN}{func}{Color.RESET}")
+                print()
+                
+            # --- OBSERVATIONS ---
+            print(f"{Color.BOLD}Observations{Color.RESET}")
+            has_issues = False
+            
+            long_funcs = detect_long_functions(args.file)
+            if long_funcs:
+                has_issues = True
+                print(f"  {Color.YELLOW}⚠ Contains {len(long_funcs)} long function(s).{Color.RESET}")
+                
+            todos = detect_todos(args.file)
+            if todos:
+                has_issues = True
+                print(f"  {Color.YELLOW}⚠ Contains {len(todos)} TODOs.{Color.RESET}")
+                
+            security = detect_security_issues(args.file)
+            if security:
+                has_issues = True
+                print(f"  {Color.RED}⚠ Contains {len(security)} security issue(s).{Color.RESET}")
+                
+            if not has_issues:
+                print(f"  {Color.GREEN}✓ No major issues detected in this file.{Color.RESET}")
+            print()
+
+
 
 
 if __name__ == "__main__":
