@@ -7,6 +7,7 @@ from project import (
     calculate_testing_deduction,
     check_project_structure,
     count_lines,
+    create_project,
     detect_long_functions,
     detect_security_issues,
     detect_todos,
@@ -92,6 +93,34 @@ def test_get_snippet_returns_none_if_missing(mock_home):
     path = get_snippet("ghost_file.py")
 
     assert path is None
+
+def test_create_project_creates_project_if_folder_does_not_exist(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+
+    result = create_project("myapp")
+    assert result == True
+
+    project_dir = tmp_path / "myapp"
+    assert project_dir.exists()
+
+    assert (project_dir / "tests").is_dir()
+    assert (project_dir / "main.py").exists()
+
+    expected_text_in_readme = (project_dir / "README.md").read_text()
+    assert expected_text_in_readme == "# myapp"
+
+    assert (project_dir / "requirements.txt").exists()
+    assert (project_dir / "tests" / "test_main.py").exists()
+
+def test_create_project_returns_false_if_folder_exists(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+
+    tmp_dir = (tmp_path / "myapp")
+    tmp_dir.mkdir()
+
+    result = create_project(tmp_dir)
+
+    assert result is False
 
 def test_scan_project_returns_python_files(tmp_path: Path):
     (tmp_path / "main.py").touch()

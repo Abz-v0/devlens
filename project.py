@@ -492,9 +492,9 @@ def main():
             analysis = analyze_file(args.file)
 
             # --- HEADER ---
-            print(f"\n{Color.CYAN}{'-' * 50}{Color.RESET}")
+            print(f"\n{Color.CYAN}{'─' * 50}{Color.RESET}")
             print(f"\n{Color.BOLD}DevLens Explain:{Color.RESET} '{args.file.name}'")
-            print(f"\n{Color.CYAN}{'-' * 50}{Color.RESET}")
+            print(f"\n{Color.CYAN}{'─' * 50}{Color.RESET}")
 
             # --- Overview ---
             print(f"{Color.BOLD}Overview:{Color.RESET}")
