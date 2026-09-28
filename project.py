@@ -131,6 +131,7 @@ def analyze_file(path):
                 "lines": count_lines(path),
                 "functions": [],
                 "classes": [],
+                "imports": [],
                 }
 
     functions = []
