@@ -176,6 +176,20 @@ def test_analyze_file_returns_line_function_and_class_details(tmp_path):
     assert analysis["functions"] == ["greet"]
     assert analysis["classes"] == ["User"]
 
+def test_analyze_file_extracts_imports(tmp_path):
+    tmp_file = tmp_path / "imports.py"
+    tmp_file.write_text(
+        "import json\n"
+        "from pathlib import Path\n"
+        "\n"
+        "def my_func():\n"
+        "    pass\n"
+    )
+    analysis = analyze_file(tmp_file)
+
+    assert "json" in analysis["imports"]
+    assert "pathlib" in analysis["imports"]
+
 def test_detect_todos_returns_real_todo_comment(tmp_path):
     todo_file = tmp_path / "todo.py"
     todo_file.write_text("# TODO validate entry")
