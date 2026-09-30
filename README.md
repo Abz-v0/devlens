@@ -1,57 +1,110 @@
-Here’s the complete README ready for you to copy:
-
-```markdown
 # DevLens
 
 **A simple Python CLI tool that helps developers understand and improve their projects.**
 
-DevLens scans Python code for common issues, gives a health score, lets you save and reuse useful snippets, scaffolds new projects, and explains individual files.
+DevLens is a command-line tool for analyzing and improving Python projects. It scans projects for common issues, calculates a health score, saves and searches reusable code snippets, scaffolds new projects, and explains individual Python files.
 
-Built as a CS50P final project.
+DevLens was built as my final project for **CS50P: Introduction to Programming with Python**.
+
+#### Video Demo: <PASTE_YOUR_YOUTUBE_LINK_HERE>
+
+---
+
+## Table of Contents
+
+- [Description](#description)
+- [Features](#features)
+- [Installation](#installation)
+- [Usage Examples](#usage-examples)
+- [Running the Tests](#running-the-tests)
+- [How the Health Score Works](#how-the-health-score-works)
+- [Design Decisions](#design-decisions)
+- [Project Structure](#project-structure)
+- [Dependencies](#dependencies)
+- [V2 Roadmap](#v2-roadmap)
+- [Author](#author)
+- [License](#license)
+
+---
+
+## Description
+
+DevLens is a command-line tool written in Python that helps developers analyze and improve the quality of their Python projects.
+
+It can scan an entire project for common issues, calculate a health score, save useful code snippets for later reuse, scaffold new projects, and explain the structure of individual Python files.
+
+I created DevLens as my final project for CS50P. I wanted to build something that went beyond a single-purpose script and combined several Python concepts into one practical command-line application.
+
+The project uses Python's standard library for its core functionality, including `argparse`, `ast`, `pathlib`, `json`, `shutil`, and `datetime`.
 
 ---
 
 ## Features
 
-| Command                  | What it does                                                                 |
-|--------------------------|------------------------------------------------------------------------------|
-| `devlens scan <path>`         | Analyzes a Python project. Finds TODOs, long functions, security issues, missing structure files, and calculates a Health Score. |
-| `devlens create <name>`       | Scaffolds a new project with a basic structure.                              |
-| `devlens explain <file>`      | Explains a single Python file (imports, functions, classes, entry point).    |
-| `devlens save <file>`         | Saves a useful snippet into your personal Vault.                             |
-| `devlens search <query>`      | Searches your Vault for previously saved snippets.                           |
-| `devlens get <name>`          | Retrieves a snippet from the Vault.                                          |
+| Command | What it does |
+| :--- | :--- |
+| `python project.py scan <path>` | Analyzes a Python project, finds common issues, checks project structure, and calculates a Health Score. |
+| `python project.py create <name>` | Scaffolds a new Python project with a basic structure. |
+| `python project.py explain <file>` | Analyzes a Python file and displays its imports, classes, functions, and detected issues. |
+| `python project.py save <file>` | Saves a useful code file or snippet to the DevLens Vault. |
+| `python project.py search <query>` | Searches the Vault for saved snippets matching a query. |
+| `python project.py get <name>` | Retrieves and displays a saved snippet from the Vault. |
 
 ---
 
 ## Installation
 
-DevLens uses only the Python standard library. No external packages needed.
+DevLens itself uses only the Python standard library. The test suite uses `pytest`.
+
+Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/devlens.git
+git clone https://github.com/Abz-v0/devlens.git
 cd devlens
 ```
 
-Run it with:
+Install the testing dependency:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+You can then run DevLens with Python:
 
 ```bash
 python project.py scan .
 ```
+
+### Requirements
+
+- Python 3.11 or later recommended
+- Git, if cloning the repository
 
 ---
 
 ## Usage Examples
 
-### Scan a project
+### Scanning a Project
+
+Use the `scan` command to analyze a Python project:
 
 ```bash
 python project.py scan .
 ```
 
+DevLens examines the project's Python files and reports information such as:
+
+- Number of Python files
+- Classes and functions
+- TODO comments
+- Long functions
+- Possible security issues
+- Project structure
+- Overall Health Score
+
 Example output:
 
-```
+```text
 ──────────────────────────────────────────────────
 DevLens Scan: .
 ──────────────────────────────────────────────────
@@ -68,104 +121,285 @@ project.py (550 lines)
       • save_snippet
       • search_snippets
       • ...and 16 more
+
   ⚠ Long functions (3):
     • analyze_file (37 lines)
     • detect_security_issues (35 lines)
     • main (219 lines)
 
-test_project.py (338 lines)
+tests\test_project.py (352 lines)
 ··················································
-  └─ Functions (33):
+  └─ Functions (34):
       • mock_home
       • test_get_vault_dir_creates_folder_under_fake_home
       • test_save_and_load_index_round_trip
-      • ...and 30 more
-  ⚠ TODOs (4)
-  ⚠ Long functions (2)
-  ⚠ Security issues (2)
+      • test_save_snippet_copies_file_and_updates_index
+      • test_save_snippet_returns_false_for_invalid_file
+      • test_search_snippets_finds_matching_names
+      • ...and 28 more
+
+  ⚠ TODOs (4):
+    • line 195: todo_file.write_text("# TODO validate entry")
+    • line 196: assert detect_todos(todo_file) == [(1, "# TODO validate entry")]
+    • line 348: "# TODO change pass to actual logic"
+    • line 349: "# TODO add input counter"
+  ⚠ Long functions (2):
+    • test_scan_project_returns_python_files (25 lines)
+    • test_file_in_good_health (21 lines)
+  ⚠ Security issues (2):
+    • line 241: possible hardcoded secret: tmp_file.write_text('password = "supersecret123"')
+    • line 243: possible hardcoded secret: assert result == [(1, 'possible hardcoded secret: password = "supersecret123"')]
 
 ──────────────────────────────────────────────────
 Project Structure
 ──────────────────────────────────────────────────
-  ✗ requirements.txt is missing
-  ✗ tests is missing
+  ✓ Project structure looks good
 
 ══════════════════════════════════════════════════
-Health Score: ██████░░░░░░░░░░░░░░ 32/100
+Health Score: █████████████░░░░░░░ 67/100
 ══════════════════════════════════════════════════
 ```
 
-### Create a new project
+The example above shows DevLens detecting issues in both the main application and its test suite. The detected TODOs, long functions, and possible hardcoded secrets demonstrate the types of problems DevLens is designed to identify.
+
+### Creating a New Project
+
+Use the `create` command to scaffold a new project:
+
 ```bash
 python project.py create my-app
 ```
 
-### Explain a file
+This creates a basic project structure containing:
+
+```text
+my-app/
+├── main.py
+├── README.md
+├── requirements.txt
+└── tests/
+    └── test_main.py
+```
+
+### Explaining a File
+
+Use the `explain` command to inspect an individual Python file:
+
 ```bash
 python project.py explain main.py
 ```
 
+DevLens reports the file's imports, classes, functions, and detected problems.
+
+### Saving a Snippet
+
+Save a useful file to the DevLens Vault:
+
+```bash
+python project.py save example.py
+```
+
+### Searching the Vault
+
+Search previously saved snippets:
+
+```bash
+python project.py search sorting
+```
+
+### Retrieving a Snippet
+
+Retrieve a saved snippet by name:
+
+```bash
+python project.py get example.py
+```
+
 ---
 
-## Health Score
+## Running the Tests
 
-The Health Score (out of 100) is calculated from four categories:
+The project includes an automated test suite covering the major parts of DevLens.
 
-- **Structure** (20 pts) — Presence of `README.md` and `requirements.txt`
-- **Code Quality** (30 pts) — Number of TODOs and long functions
-- **Security** (25 pts) — Use of `eval()` and possible hardcoded secrets
-- **Testing** (25 pts) — Presence of a real `tests/` folder with actual test files
+Run the tests with:
+
+```bash
+python -m pytest
+```
+
+The tests cover functionality including:
+
+- Vault directory and index management
+- Saving and searching snippets
+- Project scanning
+- TODO detection
+- Security issue detection
+- Health Score calculation
+- Project creation
+- File analysis
+
+The test suite currently contains **33 tests**, all of which pass.
+
+```text
+33 passed in 4.96s
+```
+
+DevLens itself does not require `pytest` to run. `pytest` is used for development and testing.
 
 ---
 
-## Dependencies
+## How the Health Score Works
 
-Built entirely with the Python standard library:
+DevLens starts each project with a score of **100**.
 
-- `argparse`
-- `ast`
-- `pathlib`
-- `json`
-- `shutil`
-- `datetime`
+Points are then deducted based on four categories:
 
-No `pip install` required.
+- **Structure — 20 points:** Checks whether `README.md` and `requirements.txt` exist.
+- **Code Quality — 30 points:** Checks for TODO comments and functions longer than 20 lines.
+- **Security — 25 points:** Looks for potentially dangerous uses of `eval()` and possible hardcoded secrets.
+- **Testing — 25 points:** Checks whether a `tests/` folder exists and whether it contains test files.
+
+Each category has a maximum deduction.
+
+I deliberately added these caps so that a project with many issues in one category does not automatically receive an extremely low score. This keeps the different categories balanced.
+
+The Health Score is intended as a simple indicator of project health rather than a replacement for a full static analysis or security tool.
+
+---
+
+## Design Decisions
+
+While building DevLens, I made several deliberate design decisions.
+
+### 1. Standard Library Only
+
+I chose to use Python's standard library for the application itself. This keeps DevLens simple to install and run and allowed me to focus on Python's built-in tools and language features.
+
+### 2. AST + Text Scanning
+
+DevLens uses Python's `ast` module to analyze the structure of Python code.
+
+This allows it to identify things such as:
+
+- Functions
+- Classes
+- Imports
+- `eval()` calls
+
+For TODOs and possible hardcoded secrets, I use text-based scanning instead. This is useful because TODOs may appear in comments and simple text patterns can identify suspicious strings without requiring a full AST-based approach.
+
+### 3. Capped Scoring System
+
+The Health Score uses separate limits for each category.
+
+Without caps, a project with a large number of TODOs or long functions could lose most of its score because of one type of issue. The caps keep the different categories balanced.
+
+### 4. Simple Vault Design
+
+The DevLens Vault stores saved snippets as normal files and maintains a small JSON index.
+
+I chose this design instead of using a database because the Vault does not require the complexity of a database. The files and JSON index are easy to understand, inspect, and debug.
+
+### 5. Readable Terminal Output
+
+I designed the terminal output to make scan results easy to understand at a glance.
+
+DevLens uses sections, ANSI colors, symbols, and a visual Health Score bar to separate different types of information.
 
 ---
 
 ## Project Structure
 
-```
+```text
 devlens/
-├── project.py          # Main CLI application
-├── test_project.py     # Unit tests
+├── project.py
+├── tests/
+│   └── test_project.py
 ├── README.md
-└── requirements.txt    # Empty (standard library only)
+├── requirements.txt
+└── .gitignore
+```
+
+### `project.py`
+
+Contains the command-line interface, built with `argparse`, along with the core DevLens functionality:
+
+- Project scanning
+- Issue detection
+- Health Score calculation
+- Vault management
+- Project creation
+- File explanation
+
+### `tests/test_project.py`
+
+Contains the automated test suite for DevLens. The tests cover the major functions and features, including scanning, issue detection, Health Score calculation, Vault operations, and project creation.
+
+### `README.md`
+
+Contains documentation explaining the project, installation, usage, design decisions, and future plans.
+
+### `requirements.txt`
+
+Contains `pytest`, which is used to run the project's test suite.
+
+---
+
+## Dependencies
+
+### Runtime Dependencies
+
+DevLens itself uses only the Python standard library.
+
+The main modules used include:
+
+- `argparse`
+- `ast`
+- `json`
+- `pathlib`
+- `shutil`
+- `datetime`
+
+### Development Dependencies
+
+The test suite uses:
+
+- `pytest`
+
+Install the testing dependency with:
+
+```bash
+python -m pip install -r requirements.txt
 ```
 
 ---
 
-## V2 Roadmap (Post-CS50P)
+## V2 Roadmap
 
-After submitting V1, planned improvements include:
+After submitting DevLens for CS50P, I plan to continue developing it.
 
-- Making DevLens installable via `pip`
-- Configuration file support (`.devlens.toml`)
-- Better report formats (summary mode, JSON/Markdown export)
-- Dependency analysis
-- Improved Vault with tags and categories
-- More project templates
-- Plugin system for custom rules
+Possible improvements include:
+
+- Making DevLens installable through `pip`
+- Adding configuration file support, such as `.devlens.toml`
+- Adding JSON and Markdown report exports
+- Adding dependency analysis
+- Improving the Vault with tags and categories
+- Adding more project templates, such as Flask applications and APIs
+- Adding a plugin system for custom detection rules
+
+These features are planned for future versions and are not part of the current CS50P submission.
 
 ---
 
 ## Author
 
-Built by Abraham Azeez as a final project for CS50P (Harvard’s Introduction to Programming with Python).
+Built by **Abraham Azeez** as a final project for **CS50P — Introduction to Programming with Python**.
+
+GitHub: https://github.com/Abz-v0/devlens
 
 ---
 
 ## License
 
-MIT
-```
+MIT License
