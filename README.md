@@ -313,8 +313,7 @@ DevLens uses sections, ANSI colors, symbols, and a visual Health Score bar to se
 ```text
 devlens/
 ├── project.py
-├── tests/
-│   └── test_project.py
+├── test_project.py
 ├── README.md
 ├── requirements.txt
 └── .gitignore
