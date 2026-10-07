@@ -6,7 +6,7 @@ DevLens is a command-line tool for analyzing and improving Python projects. It s
 
 DevLens was built as my final project for **CS50P: Introduction to Programming with Python**.
 
-#### Video Demo: <PASTE_YOUR_YOUTUBE_LINK_HERE>
+#### Video Demo: <https://youtu.be/EdKJAALavkw>
 
 ---
 
@@ -330,7 +330,7 @@ Contains the command-line interface, built with `argparse`, along with the core 
 - Project creation
 - File explanation
 
-### `tests/test_project.py`
+### `test_project.py`
 
 Contains the automated test suite for DevLens. The tests cover the major functions and features, including scanning, issue detection, Health Score calculation, Vault operations, and project creation.
 
