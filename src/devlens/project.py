@@ -2,8 +2,9 @@ import argparse
 import ast
 import json
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import TypedDict
 
 
 class Color:
@@ -15,6 +16,11 @@ class Color:
     CYAN = "\033[96m"
     GRAY = "\033[90m"
 
+class FileAnalysis(TypedDict):
+    lines: int
+    functions: list[str]
+    classes: list[str]
+    imports: list[str]
 
 def get_vault_dir():
     """Returns the path to the vault directory, creating it if it doesn't exist."""
@@ -51,7 +57,7 @@ def save_snippet(file_path):
     shutil.copy2(file_path, dest_path)
 
     index = load_index()
-    current_time = datetime.now(timezone.utc).strftime("%Y-%m-%d--%H:%M:%S%z")
+    current_time = datetime.now(UTC).strftime("%Y-%m-%d--%H:%M:%S%z")
 
     index[file_path.name] = {
         "original_path": str(file_path),
@@ -119,7 +125,7 @@ def scan_project(path):
 def count_lines(path):
     return len(path.read_text(encoding="utf-8").splitlines())
 
-def analyze_file(path):
+def analyze_file(path: Path) -> FileAnalysis:
     code = path.read_text(encoding="utf-8")
 
     # Use the ast module to safely parse the Python file's syntax tree
