@@ -1,7 +1,8 @@
 from pathlib import Path
 
 import pytest
-from project import (
+
+from devlens.project import (
     analyze_file,
     calculate_health_score,
     calculate_testing_deduction,

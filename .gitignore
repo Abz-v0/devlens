@@ -1,6 +1,18 @@
+# Virtual environments
+.venv/
+
+# Python caches
 __pycache__/
 *.pyc
+
+# Tool caches
 .pytest_cache/
-.venv/
-app.py
-practice_todo.py
+.ruff_cache/
+.pyrefly_cache/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE settings (optional, but good practice)
+.vscode/

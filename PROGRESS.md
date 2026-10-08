@@ -97,3 +97,32 @@
 - Milestone: DevLens V1 is fully complete and paused for CS50P submission (only video recording remains).
 - Set up hackathon Python environment (venv), installed FastAPI, Uvicorn, and BimpeAI SDK.
 - Next: Focus entirely on hackathon prep (building the REVIVE AI revenue recovery agent).
+
+## Days 73–80 — Sept 30–Oct 7, 2026
+- Focused on the BimpeAI hackathon and worked on the REVIVE AI revenue recovery agent.
+- Explored and worked with a new Python environment for the hackathon, including FastAPI, Uvicorn, and the BimpeAI SDK.
+- Continued preparing and refining the DevLens V1 demo after the project itself was already feature-complete.
+- Recorded the DevLens demo video, covering the main V1 features and CLI workflow.
+- Edited the demo video in CapCut and worked on the presentation, voiceovers, avatar shots, and sound/design details.
+- Finalized and submitted the CS50P final project, officially completing CS50P.
+- Shifted focus from CS50P toward the next phase of development: DevLens V2 + DSA.
+- Started preparing DevLens for the V2 phase, with the goal of keeping the project manageable and building improvements on top of V1 rather than rewriting everything.
+- Began looking into `uv` as the next development-tooling change for DevLens.
+
+**Milestone:** CS50P is officially submitted ✅
+**Next:** DevLens V2 + DSA
+**Day 81:** Continue the `uv` migration and document today's work once the session is finished.
+
+## Day 81 — Oct 8, 2026
+
+- Migrated DevLens to the `uv` ecosystem for Python project and dependency management.
+- Moved the project to a standard `src/devlens/` package layout and moved tests into `tests/`.
+- Added `pyproject.toml` and `uv.lock` for project metadata and deterministic dependency locking.
+- Added a CLI entry point so DevLens can be run with `uv run devlens`.
+- Rebuilt the virtual environment after moving the project out of OneDrive to avoid sync-related performance and file-locking issues.
+- Added Ruff and Pyrefly as development tools.
+- Updated VS Code settings to hide development/cache files from the Explorer.
+- Verified all 33 tests pass under the new package structure.
+- Current Pyrefly baseline: 14 type-checking warnings to address next.
+
+**Next:** Resolve the Pyrefly warnings, then begin V2 improvements.
