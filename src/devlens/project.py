@@ -36,10 +36,7 @@ def load_index():
     """Loads the JSON index, returning an empty dict if it doesn't exist yet."""
     index_path = get_index_path()
     if index_path.exists():
-        try:
-            return json.loads(index_path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            return {}
+        return json.loads(index_path.read_text(encoding="utf-8"))
     return {}
 
 def save_index(data):
@@ -53,10 +50,17 @@ def save_snippet(file_path):
     if not file_path.exists() or not file_path.is_file():
         return False
 
+    index = load_index()
     dest_path = get_vault_dir() / file_path.name
+    existing_entry = index.get(file_path.name)
+    if dest_path.exists() and (
+        existing_entry is None
+        or Path(existing_entry["original_path"]).resolve() != file_path.resolve()
+    ):
+        return False
+
     shutil.copy2(file_path, dest_path)
 
-    index = load_index()
     current_time = datetime.now(UTC).strftime("%Y-%m-%d--%H:%M:%S%z")
 
     index[file_path.name] = {
@@ -74,9 +78,10 @@ def search_snippets(query):
     return matches
 
 def get_snippet(name):
-    path = get_vault_dir() / name
+    vault_dir = get_vault_dir().resolve()
+    path = (vault_dir / name).resolve()
 
-    if path.exists() and path.is_file():
+    if path.is_relative_to(vault_dir) and path.is_file():
         return path
     else:
         return None
@@ -111,6 +116,14 @@ def get_score_bar(score):
         
     return f"{color}{bar}{Color.RESET}"
 
+def parse_file(path: Path) -> tuple[str, ast.Module | None]:
+    code = path.read_text(encoding="utf-8")
+
+    try:
+        return code, ast.parse(code)
+    except SyntaxError:
+        return code, None
+
 def scan_project(path):
     # Grab all Python files in the directory tree
     py_files = list(path.rglob("*.py"))
@@ -122,19 +135,13 @@ def scan_project(path):
         valid_files.append(file)
     return valid_files
 
-def count_lines(path):
-    return len(path.read_text(encoding="utf-8").splitlines())
+def count_lines(code: str):
+    return len(code.splitlines())
 
-def analyze_file(path: Path) -> FileAnalysis:
-    code = path.read_text(encoding="utf-8")
-
-    # Use the ast module to safely parse the Python file's syntax tree
-    try:
-        tree = ast.parse(code)
-    except SyntaxError:
-        # Bail out early if the file has broken syntax
+def analyze_file(code: str, tree: ast.AST | None) -> FileAnalysis:
+    if tree is None:
         return {
-                "lines": count_lines(path),
+                "lines": count_lines(code),
                 "functions": [],
                 "classes": [],
                 "imports": [],
@@ -157,15 +164,14 @@ def analyze_file(path: Path) -> FileAnalysis:
             imports.append(node.module)
         
     return {
-            "lines": count_lines(path),
+            "lines": count_lines(code),
             "functions": functions,
             "classes": classes,
             "imports": imports,
         }
 
-def detect_todos(path):
-    lines = path.read_text(encoding="utf-8").splitlines()
-
+def detect_todos(code: str):
+    lines = code.splitlines()
     matches = []
     for line_number, line in enumerate(lines):
         # Split the line at the first '#' to separate code from comments
@@ -175,14 +181,11 @@ def detect_todos(path):
             matches.append((line_number + 1, line.strip()))
     return matches
 
-def detect_long_functions(path):
-    code = path.read_text(encoding="utf-8")
-    try:
-        tree = ast.parse(code)
-    except SyntaxError:
-        return []
-
+def detect_long_functions(tree: ast.AST | None):
     long_functions = []
+    if tree is None:
+        return long_functions
+
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if node.end_lineno is None:
@@ -196,23 +199,17 @@ def detect_long_functions(path):
                 long_functions.append((node.name, function_len))
     return long_functions
 
-def detect_security_issues(path):
-    code = path.read_text(encoding="utf-8")
-
-    try:
-        tree = ast.parse(code)
-    except SyntaxError:
-        return []
-
+def detect_security_issues(code: str, tree: ast.AST | None):
     report = []
-    for node in ast.walk(tree):
-        # Look for eval() calls, which are a major security risk
-        if (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "eval"
-        ):
-            report.append((node.lineno, "eval() usage"))
+    if tree is not None:
+        for node in ast.walk(tree):
+            # Look for eval() calls, which are a major security risk
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "eval"
+            ):
+                report.append((node.lineno, "eval() usage"))
 
     # Heuristic to detect hardcoded secrets: look for suspicious words, an equals sign, and quotes
     suspicious_words = ("password", "passwd", "secret", "api_key", "apikey", "token", "access_key", "private_key", "credential")
@@ -271,8 +268,9 @@ def calculate_code_quality_deduction(py_files):
 
     # Aggregate all code quality issues across the project
     for file in py_files:
-        total_todos += len(detect_todos(file))
-        total_long_functions += len(detect_long_functions(file))
+        code, tree = parse_file(file)
+        total_todos += len(detect_todos(code))
+        total_long_functions += len(detect_long_functions(tree))
 
     # Deduct points, but cap the penalties so they don't spiral out of control
     deduction = 0
@@ -286,7 +284,8 @@ def calculate_security_deduction(py_files):
     total_secrets = 0
 
     for file in py_files:
-        issues = detect_security_issues(file)
+        code, tree = parse_file(file)
+        issues = detect_security_issues(code, tree)
         for _, issue in issues:
             if issue == "eval() usage":
                 total_eval += 1
@@ -373,8 +372,12 @@ def main():
                     print(f"{len(py_files)} Python files found.\n")
 
                     for file in py_files:
+                        code, tree = parse_file(file)
                         rel_path = file.relative_to(args.path) 
-                        analysis = analyze_file(file)
+                        analysis = analyze_file(code, tree)
+                        todo_matches = detect_todos(code)
+                        long_functions = detect_long_functions(tree)
+                        security_issues = detect_security_issues(code, tree)
 
                         # File name and subtle dotted separator
                         print(f"{Color.CYAN}{rel_path}{Color.RESET} {Color.GRAY}({analysis['lines']} lines){Color.RESET}")
@@ -403,11 +406,10 @@ def main():
                                     print(f"      {Color.GRAY}• ...and {remaining} more{Color.RESET}")
 
                         # Blank line between structure and warnings
-                        if details and (detect_todos(file) or detect_long_functions(file) or detect_security_issues(file)):
+                        if details and (todo_matches or long_functions or security_issues):
                             print()
 
                         # Report any TODOs found
-                        todo_matches = detect_todos(file)
                         if todo_matches:
                             print(f"  {Color.YELLOW}⚠ TODOs{Color.RESET} ({len(todo_matches)}):")
                             first_ten = todo_matches[:10]
@@ -418,14 +420,12 @@ def main():
                                 print(f"    {Color.GRAY}• ...and {remaining} more{Color.RESET}")
 
                         # Report long functions
-                        long_functions = detect_long_functions(file)
                         if long_functions:
                             print(f"  {Color.YELLOW}⚠ Long functions{Color.RESET} ({len(long_functions)}):")
                             for (name, length) in long_functions:
                                 print(f"    {Color.GRAY}• {Color.RED}{name}{Color.RESET} ({length} lines)")
 
                         # Report security issues
-                        security_issues = detect_security_issues(file)
                         if security_issues:
                             print(f"  {Color.RED}⚠ Security issues{Color.RESET} ({len(security_issues)}):")
                             for (line_number, issue) in security_issues:
@@ -465,7 +465,11 @@ def main():
         if success:
             print(f"{Color.GREEN}✓ Saved '{args.file.name}' to the vault.{Color.RESET}")
         else:
-            print(f"{Color.RED}Error: '{args.file.name}' is not a valid file.{Color.RESET}")
+            print(
+                f"{Color.RED}Error: Could not save '{args.file.name}'. "
+                "Check that the file is valid and the snippet name is not already in use."
+                f"{Color.RESET}"
+            )
     
     elif args.command == "search":
         matches = search_snippets(args.query)
@@ -495,7 +499,8 @@ def main():
         if not args.file.exists() or not args.file.is_file():
             print(f"{Color.RED}Error: '{args.file}' is not a valid file.{Color.RESET}")
         else:
-            analysis = analyze_file(args.file)
+            code, tree = parse_file(args.file)
+            analysis = analyze_file(code, tree)
 
             # --- HEADER ---
             print(f"\n{Color.CYAN}{'─' * 50}{Color.RESET}")
@@ -530,17 +535,17 @@ def main():
             print(f"{Color.BOLD}Observations{Color.RESET}")
             has_issues = False
             
-            long_funcs = detect_long_functions(args.file)
+            long_funcs = detect_long_functions(tree)
             if long_funcs:
                 has_issues = True
                 print(f"  {Color.YELLOW}⚠ Contains {len(long_funcs)} long function(s).{Color.RESET}")
                 
-            todos = detect_todos(args.file)
+            todos = detect_todos(code)
             if todos:
                 has_issues = True
                 print(f"  {Color.YELLOW}⚠ Contains {len(todos)} TODOs.{Color.RESET}")
                 
-            security = detect_security_issues(args.file)
+            security = detect_security_issues(code, tree)
             if security:
                 has_issues = True
                 print(f"  {Color.RED}⚠ Contains {len(security)} security issue(s).{Color.RESET}")

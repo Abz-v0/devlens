@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -12,9 +13,12 @@ from devlens.project import (
     detect_long_functions,
     detect_security_issues,
     detect_todos,
+    get_index_path,
     get_snippet,
     get_vault_dir,
     load_index,
+    main,
+    parse_file,
     save_index,
     save_snippet,
     scan_project,
@@ -44,6 +48,16 @@ def test_save_and_load_index_round_trip(mock_home):
 
     assert loaded_data == test_data
 
+def test_load_index_reports_corrupt_json_without_replacing_it(mock_home):
+    index_path = get_index_path()
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text("{invalid json", encoding="utf-8")
+
+    with pytest.raises(json.JSONDecodeError):
+        load_index()
+
+    assert index_path.read_text(encoding="utf-8") == "{invalid json"
+
 def test_save_snippet_copies_file_and_updates_index(mock_home, tmp_path):
     tmp_file = tmp_path / "my_script.py"
     tmp_file.write_text("print('hello')", encoding="utf-8")
@@ -66,6 +80,20 @@ def test_save_snippet_returns_false_for_invalid_file(mock_home, tmp_path):
     result = save_snippet(fake_file)
 
     assert result is False
+
+def test_save_snippet_does_not_overwrite_different_file_with_same_name(mock_home, tmp_path):
+    first_dir = tmp_path / "first"
+    second_dir = tmp_path / "second"
+    first_dir.mkdir()
+    second_dir.mkdir()
+    first_file = first_dir / "same.py"
+    second_file = second_dir / "same.py"
+    first_file.write_text("first", encoding="utf-8")
+    second_file.write_text("second", encoding="utf-8")
+
+    assert save_snippet(first_file) is True
+    assert save_snippet(second_file) is False
+    assert (get_vault_dir() / "same.py").read_text(encoding="utf-8") == "first"
 
 def test_search_snippets_finds_matching_names(mock_home):
     test_dict = {
@@ -94,6 +122,13 @@ def test_get_snippet_returns_none_if_missing(mock_home):
     path = get_snippet("ghost_file.py")
 
     assert path is None
+
+def test_get_snippet_rejects_path_outside_vault(mock_home):
+    outside_file = mock_home / ".devlens" / "outside.py"
+    outside_file.parent.mkdir(parents=True, exist_ok=True)
+    outside_file.write_text("secret", encoding="utf-8")
+
+    assert get_snippet("..\\outside.py") is None
 
 def test_create_project_creates_project_if_folder_does_not_exist(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
@@ -156,8 +191,8 @@ def test_scan_project_returns_empty_list_when_no_python_files(tmp_path: Path):
 def test_count_lines_returns_number_of_lines_in_python_files(tmp_path):
     tmp_file = (tmp_path / "abz.py")
 
-    tmp_file.write_text("one\ntwo\nthree")
-    line_count = count_lines(tmp_file)
+    tmp_file.write_text("one\ntwo\nthree", encoding="utf-8")
+    line_count = count_lines(tmp_file.read_text(encoding="utf-8"))
 
     assert line_count == 3
 
@@ -171,7 +206,8 @@ def test_analyze_file_returns_line_function_and_class_details(tmp_path):
         "class User:\n"
         "    pass\n"
     )
-    analysis = analyze_file(tmp_file)
+    code, tree = parse_file(tmp_file)
+    analysis = analyze_file(code, tree)
 
     assert analysis["lines"] == 5
     assert analysis["functions"] == ["greet"]
@@ -186,7 +222,8 @@ def test_analyze_file_extracts_imports(tmp_path):
         "def my_func():\n"
         "    pass\n"
     )
-    analysis = analyze_file(tmp_file)
+    code, tree = parse_file(tmp_file)
+    analysis = analyze_file(code, tree)
 
     assert "json" in analysis["imports"]
     assert "pathlib" in analysis["imports"]
@@ -194,17 +231,17 @@ def test_analyze_file_extracts_imports(tmp_path):
 def test_detect_todos_returns_real_todo_comment(tmp_path):
     todo_file = tmp_path / "todo.py"
     todo_file.write_text("# TODO validate entry")
-    assert detect_todos(todo_file) == [(1, "# TODO validate entry")]
+    assert detect_todos(todo_file.read_text(encoding="utf-8")) == [(1, "# TODO validate entry")]
 
 def test_detect_todos_ignores_todo_without_hash(tmp_path):
     print_file = tmp_path / "print.py"
     print_file.write_text("print('TODO hello world')")
-    assert detect_todos(print_file) == []
+    assert detect_todos(print_file.read_text(encoding="utf-8")) == []
 
 def test_detect_todos_returns_empty_list_when_no_todos(tmp_path):
     no_todo_file = tmp_path / "no_todo.py"
     no_todo_file.write_text("if len(name) == 2:\n    pass")
-    assert detect_todos(no_todo_file) == []
+    assert detect_todos(no_todo_file.read_text(encoding="utf-8")) == []
 
 def test_detect_long_functions_flags_long_function(tmp_path):
     tmp_file = tmp_path / "long.py"
@@ -219,7 +256,8 @@ def test_detect_long_functions_flags_long_function(tmp_path):
         + body
     )
 
-    assert detect_long_functions(tmp_file) == [("long_function", 22)]
+    _, tree = parse_file(tmp_file)
+    assert detect_long_functions(tree) == [("long_function", 22)]
 
 def test_detect_long_functions_returns_empty_list_if_short_function(tmp_path):
     tmp_file = (tmp_path / "son.py")
@@ -229,24 +267,80 @@ def test_detect_long_functions_returns_empty_list_if_short_function(tmp_path):
         "    greeting = 'hello world'\n"
         "    return greeting"
     )
-    assert detect_long_functions(tmp_file) == []
+    _, tree = parse_file(tmp_file)
+    assert detect_long_functions(tree) == []
 
 def test_detect_security_issues_flags_eval(tmp_path):
     tmp_file = tmp_path / "risky.py"
     tmp_file.write_text("x = eval('2 + 2')")
-    result = detect_security_issues(tmp_file)
+    code, tree = parse_file(tmp_file)
+    result = detect_security_issues(code, tree)
     assert result == [(1, "eval() usage")]
 
 def test_detect_security_issues_flags_hardcoded_secret(tmp_path):
     tmp_file = tmp_path / "config.py"
     tmp_file.write_text('password = "supersecret123"')
-    result = detect_security_issues(tmp_file)
+    code, tree = parse_file(tmp_file)
+    result = detect_security_issues(code, tree)
     assert result == [(1, 'possible hardcoded secret: password = "supersecret123"')]
 
 def test_detect_security_issues_returns_empty_list_for_clean_file(tmp_path):
     tmp_file = tmp_path / "clean.py"
     tmp_file.write_text("x = 5\nprint('hello')")
-    assert detect_security_issues(tmp_file) == []
+    code, tree = parse_file(tmp_file)
+    assert detect_security_issues(code, tree) == []
+
+def test_invalid_python_file_keeps_source_checks_and_skips_ast_checks(tmp_path):
+    invalid_file = tmp_path / "invalid.py"
+    invalid_file.write_text(
+        "# TODO fix syntax\n"
+        "password = 'example'\n"
+        "def broken(:\n",
+        encoding="utf-8",
+    )
+
+    code, tree = parse_file(invalid_file)
+
+    assert tree is None
+    assert detect_todos(code) == [(1, "# TODO fix syntax")]
+    assert detect_long_functions(tree) == []
+    assert detect_security_issues(code, tree) == [
+        (2, "possible hardcoded secret: password = 'example'")
+    ]
+
+def test_explain_command_analyzes_file(monkeypatch, tmp_path, capsys):
+    source_file = tmp_path / "example.py"
+    source_file.write_text(
+        "import json\n"
+        "def greet():\n"
+        "    return 'hello'\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("sys.argv", ["devlens", "explain", str(source_file)])
+
+    main()
+
+    output = capsys.readouterr().out
+    assert "Imports: " in output
+    assert "json" in output
+    assert "greet" in output
+
+def test_scan_command_skips_ast_checks_for_invalid_file(monkeypatch, tmp_path, capsys):
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    (project_dir / "invalid.py").write_text(
+        "# TODO fix syntax\n"
+        "def broken(:\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr("sys.argv", ["devlens", "scan", str(project_dir)])
+
+    main()
+
+    output = capsys.readouterr().out
+    assert "invalid.py" in output
+    assert "TODOs" in output
+    assert "# TODO fix syntax" in output
 
 def test_check_project_structure_returns_empty_list_if_good(tmp_path):
     (tmp_path / "README.md").touch()

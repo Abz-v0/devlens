@@ -126,3 +126,17 @@
 - Current Pyrefly baseline: 14 type-checking warnings to address next.
 
 **Next:** Resolve the Pyrefly warnings, then begin V2 improvements.
+
+## Day 88 — Oct 14, 2026
+
+- Fixed all 14 Pyrefly type-checking warnings using `TypedDict`.
+- Established a performance baseline for DevLens using `cProfile` (0.47s for 4 files, 29k `ast.walk` calls).
+- Refactored `analyze_file`, `detect_todos`, `detect_long_functions`, `detect_security_issues`, and `count_lines` to accept source code and AST trees instead of file paths.
+- Added `parse_file()` to read files and parse AST exactly once per file, eliminating duplicate disk I/O.
+- Fixed a crash where files with invalid syntax (`tree = None`) would break AST checks.
+- Secured vault retrieval (`get_snippet`) against path traversal attacks.
+- Prevented `save_snippet` from silently overwriting different files with the same name.
+- Updated `load_index` to report corrupt JSON rather than silently overwriting it.
+- Updated tests to match new interfaces and added regression tests for syntax errors and CLI commands.
+
+**Next:** Fix `scan_project` to dynamically ignore all `.venv` variants, then re-run the profiler to measure the new performance gains.
