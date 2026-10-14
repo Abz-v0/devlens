@@ -328,16 +328,26 @@ def test_explain_command_analyzes_file(monkeypatch, tmp_path, capsys):
 def test_scan_command_skips_ast_checks_for_invalid_file(monkeypatch, tmp_path, capsys):
     project_dir = tmp_path / "project"
     project_dir.mkdir()
-    (project_dir / "invalid.py").write_text(
+    invalid_file = project_dir / "invalid.py"
+    invalid_file.write_text(
         "# TODO fix syntax\n"
         "def broken(:\n",
         encoding="utf-8",
     )
+    parse_calls = []
+    original_parse_file = parse_file
+
+    def track_parse_file(path):
+        parse_calls.append(path)
+        return original_parse_file(path)
+
+    monkeypatch.setattr("devlens.project.parse_file", track_parse_file)
     monkeypatch.setattr("sys.argv", ["devlens", "scan", str(project_dir)])
 
     main()
 
     output = capsys.readouterr().out
+    assert parse_calls == [invalid_file]
     assert "invalid.py" in output
     assert "TODOs" in output
     assert "# TODO fix syntax" in output
@@ -431,7 +441,7 @@ def test_file_in_good_health(tmp_path):
         + body
     )
 
-    assert calculate_health_score(tmp_path, [tmp_file]) == 97
+    assert calculate_health_score(tmp_path, [parse_file(tmp_file)]) == 97
 
 def test_file_in_bad_health(tmp_path):
     (tmp_path / "requirements.txt").touch()
@@ -444,4 +454,4 @@ def test_file_in_bad_health(tmp_path):
         "# TODO add input counter"
     )
 
-    assert calculate_health_score(tmp_path, [todo_file]) == 63
+    assert calculate_health_score(tmp_path, [parse_file(todo_file)]) == 63

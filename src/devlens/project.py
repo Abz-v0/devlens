@@ -116,7 +116,7 @@ def get_score_bar(score):
         
     return f"{color}{bar}{Color.RESET}"
 
-def parse_file(path: Path) -> tuple[str, ast.Module | None]:
+def parse_file(path: Path) -> tuple[str, ast.AST | None]:
     code = path.read_text(encoding="utf-8")
 
     try:
@@ -262,13 +262,12 @@ def calculate_structure_deduction(path):
 
     return deduction
 
-def calculate_code_quality_deduction(py_files):
+def calculate_code_quality_deduction(parsed_files: list[tuple[str, ast.AST | None]]):
     total_todos = 0
     total_long_functions = 0
 
     # Aggregate all code quality issues across the project
-    for file in py_files:
-        code, tree = parse_file(file)
+    for code, tree in parsed_files:
         total_todos += len(detect_todos(code))
         total_long_functions += len(detect_long_functions(tree))
 
@@ -279,12 +278,11 @@ def calculate_code_quality_deduction(py_files):
 
     return deduction
 
-def calculate_security_deduction(py_files):
+def calculate_security_deduction(parsed_files: list[tuple[str, ast.AST | None]]):
     total_eval = 0
     total_secrets = 0
 
-    for file in py_files:
-        code, tree = parse_file(file)
+    for code, tree in parsed_files:
         issues = detect_security_issues(code, tree)
         for _, issue in issues:
             if issue == "eval() usage":
@@ -317,12 +315,12 @@ def calculate_testing_deduction(path):
             
     return deduction
 
-def calculate_health_score(path, py_files):
+def calculate_health_score(path, parsed_files: list[tuple[str, ast.AST | None]]):
     # Start with a perfect score and subtract penalties for each issue category
     score = 100
     score -= calculate_structure_deduction(path)
-    score -= calculate_code_quality_deduction(py_files)
-    score -= calculate_security_deduction(py_files)
+    score -= calculate_code_quality_deduction(parsed_files)
+    score -= calculate_security_deduction(parsed_files)
     score -= calculate_testing_deduction(path)
 
     # Never let the score drop below zero
@@ -371,8 +369,9 @@ def main():
                     print(f"{Color.CYAN}{'─' * 50}{Color.RESET}")
                     print(f"{len(py_files)} Python files found.\n")
 
-                    for file in py_files:
-                        code, tree = parse_file(file)
+                    parsed_files = [parse_file(file) for file in py_files]
+
+                    for file, (code, tree) in zip(py_files, parsed_files):
                         rel_path = file.relative_to(args.path) 
                         analysis = analyze_file(code, tree)
                         todo_matches = detect_todos(code)
@@ -447,7 +446,7 @@ def main():
                         print(f"  {Color.GREEN}✓ Project structure looks good{Color.RESET}")
 
                     # --- FINAL HEALTH SCORE ---
-                    health_score = calculate_health_score(args.path, py_files)
+                    health_score = calculate_health_score(args.path, parsed_files)
                     
                     print(f"\n{'═' * 50}")
                     print(f"Health Score: {get_score_bar(health_score)} {Color.BOLD}{health_score}/100{Color.RESET}")
