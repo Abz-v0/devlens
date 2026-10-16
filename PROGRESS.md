@@ -140,3 +140,14 @@
 - Updated tests to match new interfaces and added regression tests for syntax errors and CLI commands.
 
 **Next:** Fix `scan_project` to dynamically ignore all `.venv` variants, then re-run the profiler to measure the new performance gains.
+
+## Day 90 — Oct 16, 2026
+
+- Completed the performance engineering cycle for DevLens V2.
+- Replaced `path.rglob` with `os.walk` in `scan_project`. Added smart virtual environment detection via `pyvenv.cfg` check to instantly skip `.venv` folders.
+- Fixed the `ast.walk` bottleneck: Refactored `parse_file` to walk the AST exactly once and return a list of nodes.
+- Updated `analyze_file`, `detect_long_functions`, and `detect_security_issues` to accept the pre-parsed list of nodes instead of walking the tree individually.
+- Updated type hints and tests to match the new `list[ast.AST]` return type.
+- **Result:** Execution time dropped from 0.470s to 0.322s. `ast.walk` calls dropped from 30k to 5.9k. All 39 tests passing.
+
+**Next:** Begin Small/Medium V2 updates (Update structure checks, sub-commands, pagination).

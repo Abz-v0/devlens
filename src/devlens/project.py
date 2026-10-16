@@ -1,6 +1,7 @@
 import argparse
 import ast
 import json
+import os
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
@@ -116,43 +117,39 @@ def get_score_bar(score):
         
     return f"{color}{bar}{Color.RESET}"
 
-def parse_file(path: Path) -> tuple[str, ast.AST | None]:
+def parse_file(path: Path) -> tuple[str, list[ast.AST]]:
     code = path.read_text(encoding="utf-8")
 
     try:
-        return code, ast.parse(code)
+        tree = ast.parse(code)
+        return code, list(ast.walk(tree))
     except SyntaxError:
-        return code, None
+        return code, []
 
 def scan_project(path):
-    # Grab all Python files in the directory tree
-    py_files = list(path.rglob("*.py"))
     valid_files = []
-    for file in py_files:
+    for root, dirs, files in os.walk(path):
+        root_path = Path(root)
         # Skip virtual environments and cache folders so we don't scan dependencies
-        if any(ignored in file.parts for ignored in ("__pycache__", ".venv", ".git")): 
+        if (root_path / "pyvenv.cfg").is_file():
+            dirs.clear()
             continue
-        valid_files.append(file)
+        dirs[:] = [d for d in dirs if d not in ("__pycache__", ".git", ".venv", "venv", "env")]
+        for file in files:
+            if file.endswith(".py"):
+                valid_files.append(root_path / file)
     return valid_files
 
 def count_lines(code: str):
     return len(code.splitlines())
 
-def analyze_file(code: str, tree: ast.AST | None) -> FileAnalysis:
-    if tree is None:
-        return {
-                "lines": count_lines(code),
-                "functions": [],
-                "classes": [],
-                "imports": [],
-                }
-
+def analyze_file(code: str, nodes: list[ast.AST]) -> FileAnalysis:
     functions = []
     classes = []
     imports = []
 
     # Walk through the syntax tree to pull out classes and functions
-    for node in ast.walk(tree):
+    for node in nodes:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             functions.append(node.name)
         elif isinstance(node, ast.ClassDef):
@@ -181,12 +178,10 @@ def detect_todos(code: str):
             matches.append((line_number + 1, line.strip()))
     return matches
 
-def detect_long_functions(tree: ast.AST | None):
+def detect_long_functions(nodes: list[ast.AST]):
     long_functions = []
-    if tree is None:
-        return long_functions
 
-    for node in ast.walk(tree):
+    for node in nodes:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             if node.end_lineno is None:
                 continue
@@ -199,17 +194,16 @@ def detect_long_functions(tree: ast.AST | None):
                 long_functions.append((node.name, function_len))
     return long_functions
 
-def detect_security_issues(code: str, tree: ast.AST | None):
+def detect_security_issues(code: str, nodes: list[ast.AST]):
     report = []
-    if tree is not None:
-        for node in ast.walk(tree):
-            # Look for eval() calls, which are a major security risk
-            if (
-                isinstance(node, ast.Call)
-                and isinstance(node.func, ast.Name)
-                and node.func.id == "eval"
-            ):
-                report.append((node.lineno, "eval() usage"))
+    for node in nodes:
+        # Look for eval() calls, which are a major security risk
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "eval"
+        ):
+            report.append((node.lineno, "eval() usage"))
 
     # Heuristic to detect hardcoded secrets: look for suspicious words, an equals sign, and quotes
     suspicious_words = ("password", "passwd", "secret", "api_key", "apikey", "token", "access_key", "private_key", "credential")
@@ -262,7 +256,7 @@ def calculate_structure_deduction(path):
 
     return deduction
 
-def calculate_code_quality_deduction(parsed_files: list[tuple[str, ast.AST | None]]):
+def calculate_code_quality_deduction(parsed_files: list[tuple[str, list[ast.AST]]]):
     total_todos = 0
     total_long_functions = 0
 
@@ -278,7 +272,7 @@ def calculate_code_quality_deduction(parsed_files: list[tuple[str, ast.AST | Non
 
     return deduction
 
-def calculate_security_deduction(parsed_files: list[tuple[str, ast.AST | None]]):
+def calculate_security_deduction(parsed_files: list[tuple[str, list[ast.AST]]]):
     total_eval = 0
     total_secrets = 0
 
@@ -315,7 +309,7 @@ def calculate_testing_deduction(path):
             
     return deduction
 
-def calculate_health_score(path, parsed_files: list[tuple[str, ast.AST | None]]):
+def calculate_health_score(path, parsed_files: list[tuple[str, list[ast.AST]]]):
     # Start with a perfect score and subtract penalties for each issue category
     score = 100
     score -= calculate_structure_deduction(path)

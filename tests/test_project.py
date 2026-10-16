@@ -301,7 +301,7 @@ def test_invalid_python_file_keeps_source_checks_and_skips_ast_checks(tmp_path):
 
     code, tree = parse_file(invalid_file)
 
-    assert tree is None
+    assert tree == []
     assert detect_todos(code) == [(1, "# TODO fix syntax")]
     assert detect_long_functions(tree) == []
     assert detect_security_issues(code, tree) == [
