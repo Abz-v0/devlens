@@ -282,7 +282,7 @@ def test_detect_security_issues_flags_hardcoded_secret(tmp_path):
     tmp_file.write_text('password = "supersecret123"')
     code, tree = parse_file(tmp_file)
     result = detect_security_issues(code, tree)
-    assert result == [(1, 'possible hardcoded secret: password = "supersecret123"')]
+    assert result == [(1, 'possible hardcoded secret: password = supersecret123')]
 
 def test_detect_security_issues_returns_empty_list_for_clean_file(tmp_path):
     tmp_file = tmp_path / "clean.py"
@@ -381,7 +381,7 @@ def test_missing_requirements(tmp_path):
 
     result = check_project_structure(tmp_path)
     
-    assert result == ["requirements.txt"]
+    assert result == ["requirements.txt or pyproject.toml"]
 
 def test_missing_tests(tmp_path):
     (tmp_path / "README.md").touch()
@@ -392,7 +392,7 @@ def test_missing_tests(tmp_path):
     assert result == ["tests"]
 
 def test_everything_is_missing(tmp_path):
-    assert check_project_structure(tmp_path) == ["README.md", "requirements.txt", "tests"]
+    assert check_project_structure(tmp_path) == ["README.md", "tests", "requirements.txt or pyproject.toml"]
 
 def test_tests_exists_but_is_a_file(tmp_path):
     (tmp_path / "README.md").touch()

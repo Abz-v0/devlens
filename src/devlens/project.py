@@ -1,8 +1,10 @@
 import argparse
 import ast
+import io
 import json
 import os
 import shutil
+import tokenize
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypedDict
@@ -168,14 +170,15 @@ def analyze_file(code: str, nodes: list[ast.AST]) -> FileAnalysis:
         }
 
 def detect_todos(code: str):
-    lines = code.splitlines()
+    tokens = tokenize.generate_tokens(io.StringIO(code).readline)
     matches = []
-    for line_number, line in enumerate(lines):
-        # Split the line at the first '#' to separate code from comments
-        parts = line.split("#", 1)
-        # If there's a comment and it contains "TODO", log it
-        if len(parts) == 2 and parts[1].strip().startswith("TODO"):
-            matches.append((line_number + 1, line.strip()))
+    try:
+        for token in tokens:
+            # If there's a comment and it contains "TODO", log it
+            if token.type == tokenize.COMMENT and token.string.strip().startswith("# TODO"):
+                    matches.append((token.start[0], token.line.strip()))
+    except tokenize.TokenError:
+        pass
     return matches
 
 def detect_long_functions(nodes: list[ast.AST]):
@@ -195,6 +198,7 @@ def detect_long_functions(nodes: list[ast.AST]):
     return long_functions
 
 def detect_security_issues(code: str, nodes: list[ast.AST]):
+    suspicious_words = ("password", "passwd", "secret", "api_key", "apikey", "token", "access_key", "private_key", "credential")
     report = []
     for node in nodes:
         # Look for eval() calls, which are a major security risk
@@ -204,23 +208,29 @@ def detect_security_issues(code: str, nodes: list[ast.AST]):
             and node.func.id == "eval"
         ):
             report.append((node.lineno, "eval() usage"))
+        if (
+            isinstance(node, ast.Assign) 
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id.lower() in suspicious_words
+            and isinstance(node.value, ast.Constant) 
+            and isinstance(node.value.value, str)
+        ):
+            report.append((node.lineno, f"possible hardcoded secret: {node.targets[0].id} = {node.value.value}"))
 
-    # Heuristic to detect hardcoded secrets: look for suspicious words, an equals sign, and quotes
-    suspicious_words = ("password", "passwd", "secret", "api_key", "apikey", "token", "access_key", "private_key", "credential")
-    lines = code.splitlines()
+    if not nodes:
+        lines = code.splitlines()
 
-    for line_number, line in enumerate(lines):
-        # Skip the line where we define the words so we don't flag ourselves!
-        if "suspicious_words =" in line:
-            continue
-        has_word = any(word in line.lower() for word in suspicious_words)
-        has_equals = "=" in line
-        has_quotes = '"' in line or "'" in line
+        for line_number, line in enumerate(lines):
+            # Skip the line where we define the words so we don't flag ourselves!
+            if "suspicious_words =" in line:
+                continue
+            has_word = any(word in line.lower() for word in suspicious_words)
+            has_equals = "=" in line
+            has_quotes = '"' in line or "'" in line
 
-        # If it looks like a variable assignment with a string value, flag it
-        if has_word and has_equals and has_quotes:
-            report.append((line_number + 1, f"possible hardcoded secret: {line.strip()}"))
-
+            # If it looks like a variable assignment with a string value, flag it
+            if has_word and has_equals and has_quotes:
+                report.append((line_number + 1, f"possible hardcoded secret: {line.strip()}"))
     return report
 
 def check_project_structure(path):
@@ -229,7 +239,6 @@ def check_project_structure(path):
     # Define what a standard, healthy project structure looks like
     expected = [
         ("README.md", "file"),
-        ("requirements.txt", "file"),
         ("tests", "dir"),
     ]
 
@@ -241,6 +250,8 @@ def check_project_structure(path):
 
         if item_type == "dir" and (not item_path.exists() or not item_path.is_dir()):
             missing.append(name)
+    if (path / "requirements.txt").is_file() is False and (path / "pyproject.toml").is_file() is False:
+        missing.append("requirements.txt or pyproject.toml")
 
     return missing
 
@@ -251,7 +262,7 @@ def calculate_structure_deduction(path):
     # Penalize heavily for missing core project files
     if "README.md" in missing:
         deduction += 10
-    if "requirements.txt" in missing:
+    if "requirements.txt or pyproject.toml" in missing:
         deduction += 10
 
     return deduction
