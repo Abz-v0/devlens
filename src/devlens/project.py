@@ -216,6 +216,30 @@ def detect_security_issues(code: str, nodes: list[ast.AST]):
             and isinstance(node.value.value, str)
         ):
             report.append((node.lineno, f"possible hardcoded secret: {node.targets[0].id} = {node.value.value}"))
+        
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "os"
+            and node.func.attr == "system"
+        ):
+            report.append((node.lineno, "os.system() usage"))
+
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "subprocess"
+            and node.func.attr in ("run", "Popen", "call", "check_output")
+            and any(
+                kw.arg == "shell"
+                and isinstance(kw.value,ast.Constant)
+                and kw.value.value is True
+                for kw in node.keywords
+            )
+        ):
+            report.append((node.lineno, "subprocess.run(shell=True) usage"))
 
     if not nodes:
         lines = code.splitlines()

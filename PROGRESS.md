@@ -151,3 +151,23 @@
 - **Result:** Execution time dropped from 0.470s to 0.322s. `ast.walk` calls dropped from 30k to 5.9k. All 39 tests passing.
 
 **Next:** Begin Small/Medium V2 updates (Update structure checks, sub-commands, pagination).
+
+## Day 91 — Oct 16, 2026
+
+- **Smart TODOs:** Replaced the naive string-splitting TODO detection with the `tokenize` module. This eliminates false positives where strings containing "# TODO" were flagged as comments.
+- **Smart Security Checks:** Refactored hardcoded secret detection to use AST (`ast.Assign`). This checks the actual code structure instead of string heuristics, eliminating false positives like `print("password = ")`.
+- **Modern Project Structure:** Updated `check_project_structure` to accept either `requirements.txt` OR `pyproject.toml` so it no longer penalizes modern Python projects.
+- All 39 tests passing.
+
+**Next:** Expand security checks to flag `os.system` and `subprocess.run(shell=True)`.
+
+Excellent! All tests passing with new security checks. Here's your progress.md update:
+
+## Day 93 — Oct 19, 2026
+
+- **Expanded Security Checks:** Added AST-based detection for `os.system()` and `subprocess.run(shell=True)`—both are command injection risks.
+- **Safe subprocess detection:** Only flags `subprocess.run`/`Popen`/`call`/`check_output` when `shell=True` keyword argument is present. Safe calls with list arguments are not flagged.
+- Added 3 new tests covering os.system, unsafe subprocess, and safe subprocess.
+- All 42 tests passing.
+
+**Next:** Sub-command refactoring (`devlens vault save`, `devlens project create`).

@@ -290,6 +290,27 @@ def test_detect_security_issues_returns_empty_list_for_clean_file(tmp_path):
     code, tree = parse_file(tmp_file)
     assert detect_security_issues(code, tree) == []
 
+def test_detect_security_issues_flags_os_system(tmp_path):
+    tmp_file = tmp_path / "risky.py"
+    tmp_file.write_text("import os\nos.system('ls -l')")
+    code, tree = parse_file(tmp_file)
+    result = detect_security_issues(code, tree)
+    assert (2, "os.system() usage") in result
+
+def test_detect_security_issues_flags_subprocess_shell_true(tmp_path):
+    tmp_file = tmp_path / "risky.py"
+    tmp_file.write_text("import subprocess\nsubprocess.run('ls', shell=True)")
+    code, tree = parse_file(tmp_file)
+    result = detect_security_issues(code, tree)
+    assert (2, "subprocess.run(shell=True) usage") in result
+
+def test_detect_security_issues_ignores_safe_subprocess(tmp_path):
+    tmp_file = tmp_path / "safe.py"
+    tmp_file.write_text("import subprocess\nsubprocess.run(['ls', '-l'])")
+    code, tree = parse_file(tmp_file)
+    result = detect_security_issues(code, tree)
+    assert result == []
+
 def test_invalid_python_file_keeps_source_checks_and_skips_ast_checks(tmp_path):
     invalid_file = tmp_path / "invalid.py"
     invalid_file.write_text(
