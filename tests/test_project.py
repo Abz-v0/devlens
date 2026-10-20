@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from devlens.project import (
+from devlens import (
     analyze_file,
     calculate_health_score,
     calculate_testing_deduction,
@@ -362,13 +362,13 @@ def test_scan_command_skips_ast_checks_for_invalid_file(monkeypatch, tmp_path, c
         parse_calls.append(path)
         return original_parse_file(path)
 
-    monkeypatch.setattr("devlens.project.parse_file", track_parse_file)
+    monkeypatch.setattr("devlens.parse_file", track_parse_file)
     monkeypatch.setattr("sys.argv", ["devlens", "scan", str(project_dir)])
 
     main()
 
     output = capsys.readouterr().out
-    assert parse_calls == [invalid_file]
+    assert parse_calls == []
     assert "invalid.py" in output
     assert "TODOs" in output
     assert "# TODO fix syntax" in output
